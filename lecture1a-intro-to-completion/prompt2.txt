@@ -1,0 +1,1 @@
+For each paragraph of the following text, please generate a sentiment score which reflects how happy or sad the paragraph is. 1 is sad, 5 is neutral, and 10 is happy. 
