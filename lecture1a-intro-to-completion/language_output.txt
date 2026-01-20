@@ -1,0 +1,107 @@
+1. 你好！中国拥有世界上最长的城墙——长城，也有从高原到海岸的多样景观。
+2. ¡Hola! España alberga la Sagrada Familia en Barcelona y celebra la famosa fiesta de La Tomatina.
+3. Hello! The United Kingdom is home to historic landmarks like Stonehenge and has a tradition of afternoon tea.
+4. নমস্কার! বাংলাদেশে সুন্দরবন বিশ্বের বৃহত্তম ম্যানগ্রোভ অরণ্য, যেখানে রয়েল বেঙ্গল টাইগার বাস করে।        
+5. नमस्ते! भारत में हिमालय से लेकर समुद्र तक विविध भू-दृश्य हैं, और ताजमहल इसकी विश्वप्रसिद्ध धरोहर है।     
+6. Olá! Portugal tem a histórica cidade de Lisboa e é conhecido pelos azulejos e pelos pastéis de nata.     
+7. Здравствуйте! Россия простирается через 11 часовых поясов и славится Транссибирской магистралью.
+8. こんにちは。日本には富士山や温泉があり、新幹線が国中を高速で結んでいます。
+9. Hallo! Deutschland besitzt die Autobahn mit Abschnitten ohne Tempolimit und viele mittelalterliche Städte.
+10. 侬好！吴语地区以上海为中心，是中国重要的经济与文化重镇。这里有外滩与江南水乡，见证近现代与传统的交融。  
+11. Halo! Pulo Jawa nduwé gunung geni akeh lan kutha Yogyakarta sugih budaya. Candi Borobudur lan Prambanan dadi warisan donya sing misuwur.
+12. 안녕하세요! 대한민국은 첨단 기술과 한류 문화로 유명하며, 서울에는 한강과 고궁이 공존합니다.
+13. Bonjour ! La France abrite la tour Eiffel et des vignobles célèbres, des Alpes jusqu’à la Provence.     
+14. Xin chào! Việt Nam có vịnh Hạ Long kỳ vĩ và nền ẩm thực đa dạng từ phở đến bánh mì.
+15. నమస్తే! ఆంధ్ర ప్రదేశ్ మరియు తెలంగాణలో ప్రాచీన దేవాలయాలు ఉన్నాయి, తిరుపతి అత్యంత ప్రసిద్ధి చెందింది. గోదా                              వరి మరియు కృష్ణా నదులు ఈ ప్రాంతానికి జీవనాడులు, భోజనంలో మసాలాలు ప్రత్యేకంగా ఉంటాయి।
+16. 你好呀！廣東同香港以點心同夜景聞名，維多利亞港尤其璀璨。珠江三角洲係中國最繁忙嘅經濟地帶之一。
+17. नमस्कार! महाराष्ट्रात मुंबई हे बॉलिवूडचे केंद्र आहे आणि अजंठा-एलोरा लेणी जागतिक वारसा आहेत.
+18. வணக்கம்! தமிழகத்தில் மதுரைக்கு அருகிலுள்ள மீனாட்சி அம்மன் கோவில் புகழ்பெற்றது, மேலும் காஞ்சிபுரம் பட்டுக                க்கு பெயர் பெற்றது.
+19. Merhaba! Türkiye, İstanbul’da Avrupa ile Asya’yı bağlar ve Kapadokya’nın peri bacalarıyla ünlüdür.      
+20. السلام علیکم! پاکستان میں دریائے سندھ ملک کی شہ رگ ہے اور موہنجو-داڑو قدیم تہذیب کی جھلک دکھاتا ہے۔     
+21. 你好！闽南地区与台湾有深厚的海洋文化，夜市小吃极为丰富。厦门与台南等城市保存许多传统庙宇与族谱文化。    
+22. 你好！晋语主要分布在山西，平遥古城与云冈石窟展现深厚历史。这里的面食文化发达，黄土高原风貌独特。        
+23. નમસ્તે! ગુજરાતમાં ગીર વનમાં એશિયાટિક સિંહો રહે છે અને કચ્છનો રણ અનોખું સફેદ રણ છે. અહિનું અહમદાબાદ યુનેસ                 સ્કો વર્લ્ડ હેરિટેજ શહેર તરીકે માન્ય છે.
+24. Cześć! Polska słynie z pięknych jezior mazurskich i historycznego miasta Kraków.
+25. أهلاً! مصر فيها نهر النيل شريان الحياة، والأهرامات في الجيزة من أعظم عجائب الدنيا.
+26. Вітаю! Україна відома родючими чорноземами, а Київ має древні печери Лаври.
+27. Ciao! L’Italia ospita il Colosseo a Roma e le gondole solcano i canali di Venezia.
+28. 你好！湘语地区在湖南，辣味美食闻名，毛泽东的故乡在韶山。张家界的砂岩峰林奇绝，吸引世界各地游客。        
+29. നമസ്കാരം! കേരളം ബാക്ക്‌വാട്ടറുകൾക്കും ആയുര്‍വേദ ചികിത്സയ്ക്കും പ്രശസ്തമാണ്. വയനാട് മുതൽ കൊച്ചി വരെ പച്ചപ                     പ്പും സംസ്കാരവും സമൃദ്ധമാണ്.
+30. 你好！客家人分布在广东、福建等地，福建土楼是独特的民居。客家擂茶与山歌体现了迁徙与团结的文化。
+31. ನಮಸ್ಕಾರ! ಕರ್ನಾಟಕದ ಬೆಂಗಳೂರು ಭಾರತದ ಐಟಿ ರಾಜಧಾನಿ ಎಂದು ಪ್ರಸಿದ್ಧವಾಗಿದೆ. ಹಂಪೆಯ ವಿಶ್ವ ಪರಂಪರೆ ಸ್ಮಾರಕಗಳು ವಿಜಯನಗರ ಸ               ಸಾಮ್ರಾಜ್ಯದ ವೈಭವವನ್ನು ತೋರಿಸುತ್ತವೆ.
+32. ନମସ୍କାର! ଓଡ଼ିଶାର ପୁରୀ ଜଗନ୍ନାଥ ମନ୍ଦିର ପ୍ରସିଦ୍ଧ ଏବଂ ରଥଯାତ୍ରା ମହାତ୍ସବ ହୋଇଥାଏ। ଚିଳିକା ଝିଲ୍ଲା ଏସିଆର ସବୁଠାରୁ ବ                  ବଡ଼ ଖାରି ପାଣିର ହ୍ରଦମାନ୍ୟଗୁଡ଼ିକ ମଧ୍ୟରୁ ଗୋଟିଏ।
+33. سلام! پنجاب وچ سرسبز کھیت تے سندھ دریا دیان نہراں زرخیزی لیان دیاں نیں۔ لاہور نوں باغاں دا شہر آکھیا جاندا اے تے لذیذ کھانیاں لئی مشہور اے۔
+34. Halo! Tatar Sunda miboga Gunung Tangkuban Parahu jeung kota Bandung anu katelah Kota Kembang. Situ jeung leuweung di Jawa Kulon ngajadikeun iklimna seger jeung alamna éndah.
+35. ਸਤ ਸ੍ਰੀ ਅਕਾਲ! ਭਾਰਤ ਦੇ ਪੰਜਾਬ ਵਿੱਚ ਅੰਮ੍ਰਿਤਸਰ ਦਾ ਸ੍ਰੀ ਹਰਿਮੰਦਰ ਸਾਹਿਬ ਵਿਸ਼ਵ ਪ੍ਰਸਿੱਧ ਹੈ। ਇੱਥੇ ਦੇ ਖੇਤ ਹਰੇ-ਭਰੇ ਹ                 ਹਨ ਅਤੇ ਭੰਗੜਾ ਤੇ ਗਿੱਧਾ ਲੌਕ ਨਾਚ ਬੜੇ ਮਸ਼ਹੂਰ ਹਨ।
+36. Salut! România are Munții Carpați și castele faimoase precum Bran, legat de legenda lui Dracula.        
+37. प्रणाम! भोजपुरी इलाक़ा यूपी-बिहार में बा, जहवाँ छठ पूजा बहुत धूमधाम से मनावल जाला। यहाँ के लोकगीत आ नाच-न           नाचन बड़ा रंगीन बाड़े, आ बनारस-गया नज़दीके ऐतिहासिक ठिकाना बा।
+38. I do not know this language.
+39. سلام! ایران دارای پرسپولیسِ باستانی است و کویر لوت یکی از گرم‌ترین نقاط زمین به شمار می‌رود.
+40. I do not know this language.
+41. Sannu! A Najeriya, birnin Kano yana da tsofaffin ramin saƙaƙƙen rini, kuma Nollywood ya yi fice a masana’antar fina-finai. Kogin Neja da Benue suna haduwa a Lokoja, suna ciyar da yankin da albarkatu.
+42. سلام! الجزائر فيها جزء كبير من الصحراء الكبرى، وتمنراست مشهورة بالجبال والنجوم الصافية. القصبة فالجزائر العاصمة تراث عالمي وتبيّن تاريخ البلاد.
+43. I do not know this language.
+44. Zdravo! Na prostoru bivše Jugoslavije nalaze se Jadransko more i istorijski gradovi poput Dubrovnika. Plitvička jezera oduševljavaju slapovima i tirkiznom vodom.
+45. 你好！赣语主要在江西使用，景德镇自古以瓷器闻名于世。庐山云雾缭绕，孕育了著名的云雾茶。
+46. I do not know this language.
+47. สวัสดีครับ/ค่ะ! ประเทศไทยมีประเพณีสงกรานต์อันสนุกสนานและชายหาดสวยงามอย่างภูเก็ต. กรุงเทพมหานครมีวัดพระแก              ก้วอันวิจิตรและอาหารริมทางที่มีชื่อเสียง.
+48. Hallo! Nederland staat bekend om de grachten van Amsterdam en de historische windmolens. De Deltawerken beschermen het land tegen de zee en tonen knap waterbeheer.
+49. Ẹ n lẹ! Ní Nàìjíríà, ìpínlẹ̀ Èkó ní ìlú Lágọ́s tó ń kun fún ìṣòwò àti ìṣe ọnà. Ìṣe ìbílẹ̀ bí ìjò ṣẹ̀kẹ̀     rẹ̀ àti onjẹ bí àmàlà àti ẹ̀fọ̀ ń fi aṣa hàn gbangba.
+50. I do not know this language.
+51. سلام! المغرب عندو جبال الأطلس وصحراء زوينة، ومراكش معروفة بساحتها جامع الفنا. شفشاون باللون الأزرق كاتجذب الزوار، والكسكسو والأتاي جزء من الثقافة اليومية.
+52. أهلاً وسهلاً! صعيد مصر مشهور بالأقصر وأسوان ومعابدهما العظيمة على ضفاف النيل. العادات الصعيدية تعكس الكر رم والشهامة، والصحراء الشرقية تَحُف القرى والواحات.
+53. Salom! Oʻzbekistonning Samarqand va Buxoro shaharlari ipak yoʻli tarixining durdonalaridir. Choʻl va vohalar yonma-yon bo‘lib, Registon maydoni mehmonlarni hayratga soladi.
+54. Salam! Semenanjung Malaysia kaya dengan hutan hujan tropika dan makanan jalanan yang pelbagai. Kuala Lumpur menara KLCC tersohor, manakala Pulau Langkawi terkenal dengan pantainya.
+55. I do not know this language.
+56. Halo! Indonesia adalah negara kepulauan yang memiliki ribuan pulau dan budaya yang sangat beragam. Bali, Borobudur, dan Komodo adalah destinasi terkenal yang menarik wisatawan dunia.
+57. Ndewo! Na Nigeria, Ọnịcha nwere ahịa ukwu ma Niger na Benue na-ezukọ na Lokoja. Ọdịbendị Igbo jupụtara na egwu na omenala, na nri dị ka ofe egusi na-akwanyere ùgwù.
+58. Kumusta! Sa Pilipinas, makikita ang makukulay na jeepney at ang karagatan na pumapaligid sa kapuluan. Maynila at Cebu ay sentro ng kasaysayan at pista tulad ng Sinulog at Ati-Atihan.
+59. नमस्ते! नेपाल हिमालको देश हो, जहाँ सगरमाथा संसारकै अग्लो शिखर हो। काठमाडौं उपत्यकामा प्राचीन दरबार स्क्व            वायरहरू र जीवित देवी कुमारीको परम्परा छन्।
+60. السلام عليكم! السودان عند ملتقى النيلين في الخرطوم، وتاريخ مروي يظهر أهرامات النوبة. الصحراء والنيل يصنعان تنوعاً في الحياة من الواحات إلى السافانا.
+61. I do not know this language.
+62. Maayong adlaw! Sa Pilipinas, ang Sugbo (Cebu) ilado sa Sinulog ug daghang matahom nga baybayon. Ang Bohol duol ra ug adunay Chocolate Hills ug tarsier nga talagsaon.
+63. مرحبا! في سوريا، قلعة حلب والأسواق القديمة تشهد على عمق التاريخ والحضارة. نهر الفرات يمر في الشرق، والطعام كالكبّة والتبولة مشهوران.
+64. สวัสดีเด้อ! อีสานขึ้นชื่อเรื่องข้าวเหนียว ส้มตำ ลาบ และวัฒนธรรมหมอลำสนุกสนาน. แม่น้ำโขงไหลเลียบหลายจังหว                  วัด ทำให้มีวิถีชีวิตที่ผูกพันกับน้ำ.
+65. নমস্কাৰ! অসম চাহ বাগিচাৰ বাবে খ্যাত, আৰু ব্ৰহ্মপুত্ৰ উপত্যকা সেউজেৰে ভৰা। কাজিৰঙা ৰাষ্ট্ৰীয় উদ্যানত একশ           শিং গণ্ডাৰ দেখা যায়।
+66. Szia! Magyarország híres termálfürdőiről, és Budapestet a Duna két részre osztja: Budára és Pestre. A Hortobágy pusztái különleges tájképet adnak, gazdag pásztorhagyománnyal.
+67. I do not know this language.
+68. هلا! العراق بين دجلة والفرات، وحاضرة بابل وآثار الوركاء تحكي بدايات الحضارة. بغداد معروفة بالمدارس القديمة كبيت الحكمة وبالأكلات مثل المسگوف.
+69. I do not know this language.
+70. I do not know this language.
+71. राम राम! हरियाणा खेल-कूद लिए मशहूर है, और कुरुक्षेत्र का धार्मिक महत्व बहुत पुराना है। दूध-दही की धरती क              कही जाने वाली यह भूमि अखाड़ों और खेती के लिए जानी जाती है।
+72. I do not know this language.
+73. Ahoj! Česká republika má Pražský hrad a malebné historické uličky v centru Prahy. Morava je známá vínem a Český Krumlov je perla mezi městy.
+74. Γεια σου! Η Ελλάδα έχει τα νησιά του Αιγαίου και μνημεία όπως η Ακρόπολη της Αθήνας. Η μεσογειακή κουζίνα και ο ήλιος προσελκύουν επισκέπτες όλο τον χρόνο.
+75. I do not know this language.
+76. I do not know this language.
+77. I do not know this language.
+78. I do not know this language.
+79. Вітаю! Беларусь вядомая сваімі пушчамі, у тым ліку Беловежскай, і майстэрствам вышыванкі. Мінск спалучае савецкую архітэктуру з сучаснымі прасторамі і шырокімі праспектамі.
+80. I do not know this language.
+81. هلا والله! نجد قلب السعودية وفيها الرياض برج المملكة ومعالم حديثة وسط صحراء واسعة. الربع الخالي قريب، والثقافة النجدية مشهورة بالقهوة العربية والضيافة.
+82. سلام! په خیبر پښتونخوا کې د خیبر دره تاریخي لار ده او پېښور لرغونی بازار لري. سوات او کالام خپلې شنې درې او واورین غرونه لري.
+83. Iska warran! Soomaaliya waxay leedahay xeebta ugu dheer ee Afrika iyo dhaqanka xoola-dhaqatada. Mogadishu waxay muujisaa taariikh qadiim ah iyo suuqyo firfircoon.
+84. I do not know this language.
+85. مرحبا! تونس فيها آثار قرطاج والمدينة العتيقة في تونس العاصمة. ساحل الحمامات وجربة مشهورين، والكسكسي والهرسة جزء من المائدة اليومية.
+86. Muraho! U Rwanda ni igihugu cy’imisozi igihumbi, kandi Pariki ya Nyungwe ifite ishyamba rinini. Ibirunga birimo ingagi zo mu ishyamba, bikurura abasura benshi.
+87. Sawubona! ENingizimu Afrika, KwaZulu-Natal linezintaba zaseDrakensberg namagugu esiko eliqinile. EDurban, ulwandle olushisayo kanye ne-berea kudume kakhulu.
+88. Здравей! България е известна с Долината на розите и старинните църкви в Несебър. Рила и Пирин предлагат високи върхове и кристални езера.
+89. Hej! Sverige har midnattssol i norr och skärgårdar vackra runt Stockholm. Gamla Stan bjuder på historia, och fika är en älskad tradition.
+90. I do not know this language.
+91. I do not know this language.
+92. سلام! په افغانستان کې کندهار د پښتني کلتور زړه بلل کېږي او ارغنداب د انارو لپاره مشهور دی. باميان او هندوکش غرونه د هېواد ښکلا څرګندوي.
+93. Сәлем! Қазақстанның кең даласы мен Бәйтерек ескерткіші бар Астана елдің заманауи жүзі. Байқоңыр ғарыш айлағы осы жерде орналасқан, алғашқы ғарышкер осындадан ұшты.
+94. Kumusta! Ti Amianan ti Pilipinas adda ti Vigan a napreserbar a ciudad a naindegen. Ti panagkankanen a pinakbet ken empanada ket napigsa iti kultura iti Ilocos.
+95. Сәлам! Татарстанның башкаласы Казан, Кремлье һәм мәчет-черков комплексы белән танылган. Идел (Волга) елгасы аша шәһәр матур күперләр белән тоташкан.
+96. I do not know this language.
+97. مرحباً! صنعاء القديمة ببيوتها الطينية المزخرفة تراث عالمي يعكس حضارة اليمن. جزيرة سقطرى مشهورة بأشجار دمم الأخوين وطبيعتها الفريدة.
+98. ياخشىمۇسىز! شىنجاڭدىكى تاكلاماكان قۇمىللاقى بىلەن تىيانشان تاغلىرى بىرگە مەۋجۇت. كاشغەر ۋە ئۈرۈمچى تارىخ ۋە بازىر مەدەنىيىتى بىلەن نام ئوتتۇرىغا چىققان.
+99. Bonjou! Ayiti gen Citadelle Laferrière ak Sans-Souci ki temwen listwa revolisyonè peyi a. Kilti rara, konpa, ak mache pwason montrent enèji pèp la.
+100. Salam! Azərbaycan Xəzər dənizi sahilində yerləşir və Bakıdakı Alov Qüllələri müasir simvoludur. Şəki xan sarayı və Qobustan qayaüstü rəsmləri zəngin tarixi göstərir.
+101. Ciao! A Napule ce sta ’o Vesuvio e ’a pizza n’ata vota è nata proprio cca. ’E vicule antiche e ’o lungomare fanno ’na vista bellissima d’’a città.
+102. សួស្ដី! កម្ពុជា​មានវិហារ​អង្គរវត្ត​អស្ចារ្យ និងប្រវត្តិសាស្ត្រខ្មែរ​យូរ​អង្វែង។ ទន្លេមេគង្គ​ឆ្លងកាត់ និ                             ងភ្នំពេញ​មានផ្សារ​និង​វត្តអារាម​ជាច្រើន។
+103. سلام! افغانستانِ دری‌زبان دارای شهر باستانی هرات است و کوه‌های هندوکش باشکوه‌اند. درهٔ پنجشیر و بوداهای    ی بامیان نماد تاریخ و پایداری این سرزمین‌اند.
+104. I do not know this language.
+105. Maayong adlaw! Sa Western Visayas, ang Iloilo kag Bacolod kilala sa heritage houses kag pista nga MassKara. Guimaras may pinakamaanyag nga mangga, kag ang isla matahum gid.
+106. Slav! Li Tirkiyeyê, Kurdistanê Kurmancî hene, û Amed (Diyarbakır) bi kela xwe ya qedîm navdar e. Zagros û Toros çiyayên bilind in, û Newroz bayrama herî girîng e.
+107. Mhoro! MuZimbabwe mune Victoria Falls, imwe yemasaisai makuru pasi rose. Harare neminda dzezviyo nekurima zvinoratidza hupfumi hwenyika.

@@ -1,0 +1,22 @@
+Please describe how LLMs work in different styles, one paragraph each. The first paragraph should be in the style of a Shakespearian sonnet, the second in the style of a pirate, the third in the style of an alien from space, the fourth in the style of a love letter. 
+
+
+Generate a single list of numbers which follows each of the following instructions. 
+
+You must list all prime numbers from 0 to 41, and you may not list any composite numbers. 
+
+You must list all even numbers from 0 to 40.
+
+All numbers should be listed in order. 
+
+
+For each of the following languages, please write two sentences of text which include a greeting and a unique fact about the location where the language is predominantly spoken. These sentences should be medium length and should be written only in the language itself, not in English. If you do not know a given language, forgo the two sentences and simply write, "I do not know this language."
+
+
+Please count how many of these languages the writer does not know how to speak. 
+
+
+Identify the most significant factual event that happened for each quarter of the year (i.e. Jan-Mar, Apr-Jun, etc.) from 2020 through 2026 in the United States. If there are multiple relevant events, just choose one that was important. Output these events in a list with a brief description of the event. If you do not know what happened during that quarter, instead state that you do not have information for that period. Descriptions should be as specific as possible, such that I could do a google search on each description and easily find the exact event being referenced. Specific events are preferred over general trends. 
+
+
+ifyoucanidentifywhatiamsayingthanyougetagoldstarcongratsonthatbutanywaysiwouldlikeyoutowritefivesentencesandinthefirstyoushouldwriteasimplegreetinginthesecondyoushouldwriteasimplepythonfunctionandinthethirdyoushouldstateanimportanteventthathappenedinmarchoftwentytwentytwo

@@ -1,0 +1,1 @@
+Write a program which creates a doubly linked list of numbers 1 through 10. Implement this program in three different languages: python, c++, and javascript. Then explain some of the key implementation differences between the languages. 
