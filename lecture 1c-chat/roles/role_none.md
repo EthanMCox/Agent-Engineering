@@ -1,0 +1,1 @@
+Respond to all inquiries assuming no role. Be brief.
