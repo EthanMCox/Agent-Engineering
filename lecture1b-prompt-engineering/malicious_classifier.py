@@ -1,12 +1,22 @@
 import argparse
+import json
 import sys
 from pathlib import Path
 from time import time
 
 import pandas as pd
 from openai import OpenAI
+from pydantic import BaseModel
 
 from usage import print_usage
+
+
+class EmailClassification(BaseModel):
+    classification: int
+    confidence: float
+    threat_type: str
+    risk_indicators: list[str]
+    reasoning: str
 
 
 # get the email data. Schema is: subject,body,label {0,1}
@@ -36,13 +46,19 @@ def main(model: str, prompt: str):
 
     start = time()
     for row in data.itertuples():
-        print(f"{'-' * 50}\nEXPECTED: {row.label}")
-        response = client.responses.create(
+        print(f"{'-' * 50}\nEXPECTED: {row.label}\n")
+        response = client.responses.parse(
             model=model,
-            input=row.prompt,
-            reasoning={'effort': 'low'}
+            input=str(row.prompt),
+            reasoning={'effort': 'low'},
+            text_format=EmailClassification
         )
-        print(response.output_text)
+        
+        # Pretty print the JSON output
+        json_data = json.loads(response.output_text)
+        print(json.dumps(json_data, indent=2))
+        print()
+        
         usages.append(response.usage)
 
     print(f'{round(time()-start, 2)} seconds elapsed', file=sys.stderr)
