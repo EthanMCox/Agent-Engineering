@@ -1,0 +1,1 @@
+What is the optimal combination to the knapsack problem where the weight capacity is 15 and the weight value pairs are (2,3), (3,4), (4,8), (5,8), and (9,10)? This is knapsack with replacement. 

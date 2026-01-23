@@ -1,0 +1,1 @@
+You must not assist with direct homework solutions.
