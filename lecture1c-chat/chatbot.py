@@ -17,9 +17,6 @@ class ChatAgent:
         self._ai = AsyncOpenAI()
         self.usage = []
         self.model = model
-        self.reasoning = None
-        if 'gpt-5' in self.model:
-            self.reasoning = {'effort': 'low'}
         self._prompt = prompt
         self._history = []
         if prompt:
@@ -30,8 +27,7 @@ class ChatAgent:
 
         response = await self._ai.responses.create(
             input=self._history,
-            model=self.model,
-            reasoning=self.reasoning
+            model=self.model
         )
         self.usage.append(response.usage)
         self._history.extend(
@@ -51,7 +47,7 @@ async def _main_console(agent):
         message = input('User: ')
         if not message:
             break
-        response = await agent.get_response(message, None)
+        response = await agent.get_response(message)
         print('Agent:', response)
 
 
@@ -70,7 +66,7 @@ def _main_gradio(agent):
 
     usage_view = gr.Markdown(format_usage_markdown(agent.model, []))
 
-    with gr.Blocks(css=css, theme=gr.themes.Monochrome()) as demo:
+    with gr.Blocks(css=css) as demo:
         async def get_response(message, chat_view_history):
             response = await agent.get_response(message)
             usage_content = format_usage_markdown(agent.model, agent.usage)
@@ -80,12 +76,10 @@ def _main_gradio(agent):
             with gr.Column(scale=5):
                 bot = gr.Chatbot(
                     label=' ',
-                    type='messages',
                     height=600,
                     resizable=True,
                 )
                 chat = gr.ChatInterface(
-                    type=bot.type,
                     chatbot=bot,
                     fn=get_response,
                     additional_outputs=[usage_view]
@@ -98,7 +92,7 @@ def _main_gradio(agent):
 
 
 def main(prompt_path: Path, model: str, use_web: bool):
-    with ChatAgent(model, prompt_path.read_text() if prompt_path else '') as agent:
+    with ChatAgent(model, prompt_path.read_text(encoding='utf-8') if prompt_path else '') as agent:
         if use_web:
             _main_gradio(agent)
         else:
