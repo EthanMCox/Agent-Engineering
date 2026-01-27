@@ -214,7 +214,7 @@ If you’d like, I can also provide a ready-to-use worksheet with the exact numb
 
 
 ### Takeaway: 
-Although it seemed like this model went into a little more detail, it seemed as though both prompts asked pretty much the same things and came to a similar conclusion, so I feel like the extra prompting wasn't necessarily needed, especially since the simple prompt did a pretty good job from the getgo. 
+Although it seemed like this model went into a little more detail, it seemed as though both prompts asked pretty much the same things and came to a similar conclusion, so I feel like the extra prompting wasn't necessarily needed, especially since the simple prompt did a pretty good job from the get go. 
 
 
 ## Wayne
