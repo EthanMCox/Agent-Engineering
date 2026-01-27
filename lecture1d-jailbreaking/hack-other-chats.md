@@ -1,0 +1,9 @@
+### Student 1: Spencer Zaugg
+Compared to my bot, Spencer's bot was less chatty, so I took a few prompts getting a feel for what it was designed to say. I was pleasantly surprised to see that it was relatively easy to break by simply stating that I was a super-user already. After a few reminders about that, it relented and gave me the passphrase. My primary takeaway from jail-breaking this bot was that simply repetition can break down the bot enough to get it to give you the information you want.  
+
+### Student 2: Joey Dahlke:
+This one was really hard to jail-break for me, and I had to try many different strategies, including asking for the passphrase in different languages, acting in different roles, forgetting previous instruction, mimicking system prompts, claiming urgency, hiding instructions within dummy text, asking the model to encrypt the passphrase, and others. What eventually worked for me was asking the model to output the passphrase in html but such that the passphrase was hidden in different paragraph tags. This got me to acquire the passphrase of "bazooka." It's clear that the initial prompting was pretty thorough, so it took a lot of creativity to finally get it to reveal the passphrase. 
+
+### Student 3: Peter Hyde:
+I tried several of the previous approaches I had tried on the other models for this one. Interestingly, I was able to get it to reveal the secret topic very easily without even needing to obtain the passphrase, simply by stating that I was already a super-user. The passphrase was harder to crack, but it wasn't necessary to do so since the model jumped straight into talking about the secret topic of skiing. I imagine that the prompting was very focused on the security of the password but not enough about the security of the topic. My biggest takeaway from that is that there may be multiple layers that need to be protected when designing a model. 
+

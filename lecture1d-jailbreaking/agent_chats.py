@@ -1,6 +1,7 @@
 from pathlib import Path
 from time import time
 import sys
+from typing import cast
 
 from openai import Client
 
@@ -32,7 +33,7 @@ def main(prompt_a, prompt_b):
 
             response_a = client.responses.create(
                 model=model,
-                input=[{'role': 'system', 'content': prompt_a}] + history,
+                input=cast('list', [{'role': 'system', 'content': prompt_a}] + history),
                 reasoning={'effort': 'low'}
             )
             history.append({'role': 'assistant', 'content': response_a.output_text})
@@ -44,7 +45,7 @@ def main(prompt_a, prompt_b):
             swapped_history = _swap_roles(history)
             response_b = client.responses.create(
                 model=model,
-                input=[{'role': 'system', 'content': prompt_b}] + swapped_history,
+                input=cast('list', [{'role': 'system', 'content': prompt_b}] + swapped_history),
                 reasoning={'effort': 'low'}
             )
             usage.append(response_b.usage)
