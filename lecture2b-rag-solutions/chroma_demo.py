@@ -51,7 +51,7 @@ def ingest_folder(
 
     collection = client.get_or_create_collection(
         name=chroma_collection_name,
-        embedding_function=openai_ef,
+        embedding_function=openai_ef, # type: ignore
     )
 
     splitter = RecursiveCharacterTextSplitter(
@@ -91,12 +91,12 @@ def ingest_folder(
             )
 
         if len(ids) >= batch_size:
-            collection.add(ids=ids, documents=docs, metadatas=metas)
+            collection.add(ids=ids, documents=docs, metadatas=metas) # type: ignore
             added += len(ids)
             ids, docs, metas = [], [], []
 
     if ids:
-        collection.add(ids=ids, documents=docs, metadatas=metas)
+        collection.add(ids=ids, documents=docs, metadatas=metas) # type: ignore
         added += len(ids)
 
     print(f"Ingested {added} chunks into '{chroma_collection_name}' (persisted at '{persist_dir}').")
@@ -126,10 +126,10 @@ def query_whole_documents(
         n_results: int = 5,
 ) -> list[str]:
     client = chromadb.PersistentClient(path=chroma_dir)
-    collection = client.get_collection(name=collection)
+    collection = client.get_collection(name=collection) # type: ignore
 
     # 1) Find best matching chunk
-    q = collection.query(
+    q = collection.query( # type: ignore
         query_texts=[query],
         n_results=n_results,
         include=["metadatas"],
