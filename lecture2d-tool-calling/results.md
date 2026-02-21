@@ -1,0 +1,21 @@
+## Building extra tools
+
+### Miscellaneous tools
+
+**String reversal**: Before building stats tools, I experimented with having the bot reverse a string with and without a tool. I found that using a tool not only made the chatbot respond more quickly, but the reasoning was a lot more streamlined. Without a tool, the chatbot had to use its own complex logic for reversing a string, which took a while. With the tool, the bot immediately recognized that it could use the tool and the reasoning chain became much shorter. 
+
+### Stats tools
+
+**Random Number Generation**: I experimented with the tool to generate a random integer between a range, so I went with a range between 1 and 10. Without a tool, the model seemed to have a strong preference for picking numbers that hadn't been picked before, so after asking it to repeat itself several times, I found that after less than 15 attempts the model generated every number between 1 through 10, and its reasoning indicated that it picked numbers because they hadn't been picked yet. With a tool, there was more clustering, which is indicative of true randomness. I got a couple repeats after just a few attempts, and the output appeared more random than simply cycling through numbers that hadn't been picked yet. 
+
+**Sampling with replacement**: This experiment was especially interesting because when I did not have the efficient tool, the chatbot still used multiple tool calls for random number generation, so although it worked, it was somewhat inefficient in its tool call usage. By comparison, only one tool call was needed with the correct tool. When I removed all tools, I noticed a pattern that the model would consistently have the 4th or 5th number repeat the first number of the sequence, which indicated that it wasn't truly random and simply added a repeated number because I stated that the algorithm was to use replacement techniques. 
+
+**Heads or tails**: I created a probability function and tested its presence and absence when flipping a coin. I was surprised that even when the tool existed, the model preferred to rely on its own "randomness" with the ordinary 50/50 assumption and it hardly ever repeated heads or tails, switching alternately almost every single time. However, when I told it that the probability was 70/30 it did consistently call the function and it worked more effectively than asking the model to flip a coin without access to the tool. 
+
+
+## Web tool
+I used the beautiful soup library to extract information from urls and to parse the html into the core content of any website that is searched. I experimented with giving the chatbot a fake website, which expectedly did not work. It did a good job of summarizing real sites that I gave it however. 
+
+## General Conference Quote Finder
+For this, I created a system prompt to give the tool bot some extra context of what it should do. I also experimented with creating different tools for the purposes of doing the search. At first I tried having the AI call the previous web tool for getting the contents of the page and having the ai use those contents to determine what web page to scrape next, but that was inefficient, so I created another tool which would scrape the contents of general conference talks from a speaker's page on the general conference website. The bot workflow was to find the speaker's website by first retrieving the correct url by calling the previous URL content retriever, then calling the content retriever again on the speaker's url, then calling the scraper to get the content from the speaker's talks. Finally, the chatbot would find the correct quote and give it to the user. I found that this approach didn't work very well with old talks like President Nelson's talk where he famously talked about the focus of our lives contributing more to our joy than our circumstances. However, it worked better with more recent talks from speakers. I don't think this is the most efficient way of doing it, especially because taking content from each speaker's talk is a good way of overloading the context window, but it was really interesting to create a working workflow which would allow the agent to find the information that it needed. 
+

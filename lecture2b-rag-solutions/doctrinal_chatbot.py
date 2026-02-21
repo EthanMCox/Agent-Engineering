@@ -237,7 +237,7 @@ def main_gradio(chatbot: DoctrinalChatbot):
         chat = gr.ChatInterface(
             fn=respond,
             examples=[
-                "What did President Nelson say about faith?",
+                "What did President Oaks say about faith?",
                 "How can I strengthen my family?",
                 "What counsel was given about the covenant path?",
             ],

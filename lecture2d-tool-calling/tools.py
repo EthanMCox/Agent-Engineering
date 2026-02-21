@@ -35,6 +35,15 @@ def _get_strict_json_schema_type(annotation) -> dict:
 
     if origin in type_map:
         return {"type": type_map[origin]}
+    
+    # Handle list types (e.g., list[str], list[int])
+    if origin is list:
+        if args:
+            item_type = args[0]
+            item_schema = _get_strict_json_schema_type(item_type)
+            return {"type": "array", "items": item_schema}
+        else:
+            return {"type": "array"}
 
     if origin is Literal:
         values = args

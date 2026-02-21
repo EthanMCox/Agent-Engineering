@@ -12,6 +12,8 @@ from openai import AsyncOpenAI
 
 from tools import ToolBox
 from usage import print_usage, format_usage_markdown
+from url_fetcher import fetch_url_content
+from conference_tools import scrape_speaker_talks
 
 our_tools = ToolBox()
 
@@ -20,6 +22,71 @@ our_tools = ToolBox()
 def get_random_number(lower: int, upper: int) -> int:
     """Get a random number"""
     return random.randint(lower, upper)
+
+
+@our_tools.tool
+def reverse_string(text: str) -> str:
+    """Reverse a string by returning the characters in reverse order"""
+    return text[::-1]
+
+
+@our_tools.tool
+def random_sample(items: list[str], sample_size: int, with_replacement: bool) -> list[str]:
+    """Randomly sample items from a list with or without replacement.
+    
+    Args:
+        items: The list of items to sample from
+        sample_size: The number of items to sample
+        with_replacement: If True, allows sampling the same item multiple times. If False, each item can only be selected once.
+    """
+    if with_replacement:
+        return random.choices(items, k=sample_size)
+    else:
+        return random.sample(items, k=sample_size)
+
+
+@our_tools.tool
+def boolean_classifier(probability: float) -> bool:
+    """Return True or False based on a probability threshold.
+    
+    Args:
+        probability: A float between 0.0 and 1.0 representing the probability of returning True.
+                    For example, 0.7 means 70% chance of True, 30% chance of False.
+    """
+    return random.random() < probability
+
+
+@our_tools.tool
+def get_url_content(url: str) -> str:
+    """Fetch and extract text content from a URL, removing HTML tags and formatting.
+    
+    Args:
+        url: The URL to fetch content from (must be http or https protocol)
+    """
+    try:
+        return fetch_url_content(url)
+    except Exception as e:
+        return f"Error fetching URL: {str(e)}"
+
+
+@our_tools.tool
+def get_speaker_conference_talks(speaker_page_url: str, max_talks: int = 10) -> str:
+    """Scrape talks from a General Conference speaker's page with configurable limit.
+    
+    Args:
+        speaker_page_url: The URL to the speaker's General Conference page 
+                         (e.g., https://www.churchofjesuschrist.org/study/general-conference/speakers/russell-m-nelson)
+        max_talks: Maximum number of talks to retrieve (default: 10, max: 100). Higher values will take longer due to rate limiting.
+    """
+    try:
+        # Cap at 100 and add delay for rate limiting
+        limited_talks = min(max_talks, 100)
+        # Adjust delay based on number of talks (more talks = longer delay to respect rate limits)
+        delay = 1.5 if limited_talks <= 20 else 2.0
+        return scrape_speaker_talks(speaker_page_url, max_talks=limited_talks, delay_between_talks=delay)
+    except Exception as e:
+        return f"Error fetching speaker talks: {str(e)}"
+
 
 
 class ChatAgent:

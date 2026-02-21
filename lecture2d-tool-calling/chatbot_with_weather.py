@@ -47,7 +47,8 @@ class ChatAgent:
         prev_id = response.id
 
         for tool_call in response.output:
-            if tool_call.type == "function_call":
+            # Only process function_call items
+            if tool_call.type != "function_call":
                 continue
 
             if tool_call.name == "get_weather":
@@ -109,7 +110,7 @@ def _main_gradio(agent):
 
     usage_view = gr.Markdown(format_usage_markdown(agent.model, []))
 
-    with gr.Blocks(css=css, theme=gr.themes.Monochrome()) as demo:
+    with gr.Blocks() as demo:
         async def get_response(message, chat_view_history):
             response = await agent.get_response(message)
             usage_content = format_usage_markdown(agent.model, agent.usage)
@@ -131,7 +132,7 @@ def _main_gradio(agent):
             with gr.Column(scale=1):
                 usage_view.render()
 
-    demo.launch()
+    demo.launch(css=css)
 
 
 def main(prompt_path: Path, model: str, use_web: bool):
