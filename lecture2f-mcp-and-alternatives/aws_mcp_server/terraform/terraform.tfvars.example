@@ -1,0 +1,5 @@
+aws_region               = "us-west-2"
+project_name             = "agent-engineer-opinions-mcp"
+lambda_architecture      = "x86_64"
+existing_lambda_role_arn = "arn:aws:iam::<account-id>:role/<existing-lambda-role>"
+image_uri                = "<account-id>.dkr.ecr.us-west-2.amazonaws.com/agent-engineer-opinions-mcp:latest"
