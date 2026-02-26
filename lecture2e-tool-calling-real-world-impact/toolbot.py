@@ -17,12 +17,12 @@ from usage import print_usage, format_usage_markdown
 our_tools = ToolBox()
 
 # # if you want to try the superbowl "database" use this
-# from superbowldb import get_superbowl_info
-# our_tools.tools(get_superbowl_info)
+from superbowldb import get_superbowl_info
+our_tools.tool(get_superbowl_info)
 #
 # # if you want to try executing code in the container from the docker directory use this
 # from codebot import execute_code
-# our_tools.tools(execute_code)
+# our_tools.tool(execute_code)
 
 def _exec_python(code) -> tuple[str, str]:
     out_buffer = io.StringIO()
@@ -87,7 +87,7 @@ class ChatAgent:
                 input=self._history,
                 model=self.model,
                 reasoning=self.reasoning,
-                tools=our_tools.tools
+                tools=our_tools.tools + [{"type": "web_search"}]
             )
 
             self.usage.append(response.usage)

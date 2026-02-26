@@ -13,5 +13,5 @@ run:
   --cap-drop ALL \
   --user 1000:1000 \
   --security-opt no-new-privileges:true \
-  -v ./task.py:/workspace/task.py:ro \
+  -v $(CURDIR)/task.py:/workspace/task.py:ro \
   safe-container:latest /workspace/task.py --timeout 10
