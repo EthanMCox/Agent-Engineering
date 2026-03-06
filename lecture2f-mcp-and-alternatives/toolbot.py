@@ -41,21 +41,25 @@ class ChatAgent:
         self._history.append({'role': 'user', 'content': user_message})
 
         while True:
+            # Build MCP tool config
+            google_mcp_tool = {
+                "type": "mcp",
+                "server_label": "google-mcp",
+                "server_url": 'https://mapstools.googleapis.com/mcp',
+                "require_approval": "never",
+            }
+            # Only add headers if API key is set
+            google_api_key = os.getenv('GOOGLE_API_KEY')
+            if google_api_key:
+                google_mcp_tool["headers"] = {
+                    "X-Goog-Api-Key": google_api_key,
+                }
+            
             response = await self._ai.responses.create(
                 input=self._history,
                 model=self.model,
                 reasoning=self.reasoning,
-                tools=our_tools.tools + [
-                    {
-                        "type": "mcp",
-                        "server_label": "google-mcp",
-                        "server_url": 'https://mapstools.googleapis.com/mcp',
-                        "require_approval": "never",
-                        "headers": {
-                            "X-Goog-Api-Key": os.getenv('GOOGLE_API_KEY'),
-                        },
-                    }
-                ]
+                tools=our_tools.tools + [google_mcp_tool]
             )
 
             print('OUTPUT', response.output)

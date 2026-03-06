@@ -20,19 +20,25 @@ our_tools = ToolBox()
 stock_tool = [{
     "type": "mcp",
     "server_label": "Stock_Ticker_Server",
-    "server_url": "https://127.0.0.1:8000" + "/mcp",
+    # Replace with ngrok URL after running: ngrok http 8000
+    # "server_url": "https://YOUR-NGROK-URL.ngrok-free.app/mcp",
+    "server_url": "https://crowded-anglea-semiprovincial.ngrok-free.dev/mcp",
+    # Alternative: use the remote demo server instead
     # "server_label": "byu-cs-mcp-demo",
     # "server_url": "https://byu-cs-mcp-demo.fastmcp.app/mcp",
     "require_approval": "never",
 }]
-# opinions_tool = [{
-#     "type": "mcp",
-#     "server_label": "opinions",
-#     "server_url": "<MCP ENDPOINT HERE>",  # terraform output mcp_endpoint
-#     "require_approval": "never"
-# }]
+opinions_tool = [{
+    "type": "mcp",
+    "server_label": "opinions",
+    # "server_url": "https://crowded-anglea-semiprovincial.ngrok-free.dev/mcp",  # Replace with your ngrok URL
+    "server_url": "https://knvkghkdl6.execute-api.us-west-2.amazonaws.com/mcp",
+    "require_approval": "never"
+}]
 
-our_tools.tools += stock_tool
+# Add both tools (comment out ones you don't need)
+# our_tools.tools += stock_tool
+our_tools.tools += opinions_tool
 
 class ChatAgent:
     def __init__(self, model: str, prompt: str, show_reasoning: bool, reasoning_effort: str | None):
