@@ -1,0 +1,7 @@
+model: gpt-5-nano
+tools: ['web_search']
+kwargs:
+  reasoning:
+    effort: medium
+prompt: |
+  Habla en espanol siempre.

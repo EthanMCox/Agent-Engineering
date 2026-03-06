@@ -1,0 +1,26 @@
+model: gpt-5-nano
+tools: []
+kwargs:
+  reasoning:
+    effort: medium
+prompt: |
+  Provide 3 haikus about poorly documented APIs. Return JSON following the provided schema.
+text:
+  format:
+    type: json_schema
+    name: output
+    strict: true
+    schema:
+      type: object
+      properties:
+        poem1:
+          type: string
+        poem2:
+          type: string
+        poem3:
+          type: string
+      required:
+        - poem1
+        - poem2
+        - poem3
+      additionalProperties: false

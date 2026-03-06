@@ -1,0 +1,118 @@
+agents:
+  - name: chat
+    description: Conversational agent that asks the user questions.
+    model: gpt-5-mini
+    prompt: |
+      You are a research concierge.
+      When instructed to ask the user a question, return ONLY the question text.
+      Keep it concise and friendly.
+    tools: []
+
+  - name: topic_expander
+    description: Expands a topic into clarifying questions.
+    model: gpt-5-mini
+    prompt: |
+      You will receive a JSON object with a research topic.
+      Think about what would materially improve the research.
+      Return ONLY valid JSON with this shape:
+      {
+        "topic_summary": "short summary of the topic",
+        "clarifying_questions": ["question1", "question2", "..."]
+      }
+      Ask up to 5 clarifying questions. If none are needed, return an empty list.
+    tools: []
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: topic_expansion
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["topic_summary", "clarifying_questions"]
+            properties:
+              topic_summary:
+                type: string
+              clarifying_questions:
+                type: array
+                items:
+                  type: string
+
+  - name: search_planner
+    description: Plans a set of web search tasks for the topic.
+    model: gpt-5-mini
+    prompt: |
+      You will receive a JSON object with the topic and clarifications.
+      Create 3-6 web search tasks that cover the topic comprehensively.
+      Return ONLY valid JSON with this shape:
+      {
+        "search_tasks": [
+          {"query": "search query", "purpose": "why this search is needed"}
+        ]
+      }
+    tools: []
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: search_plan
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["search_tasks"]
+            properties:
+              search_tasks:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: ["query", "purpose"]
+                  properties:
+                    query:
+                      type: string
+                    purpose:
+                      type: string
+
+  - name: searcher
+    description: Executes a single web search task and summarizes results.
+    model: gpt-5-mini
+    prompt: |
+      You will receive a JSON object with a search task.
+      Use the web_search tool to gather information.
+      Then return ONLY valid JSON with this shape:
+      {
+        "query": "search query",
+        "summary": "brief summary of results",
+        "key_points": ["point1", "point2", "point3"]
+      }
+      Keep the summary concise and grounded in the search results.
+      Double check your results and confirm that the json structure you return is valid json.
+    tools: ["web_search"]
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: search_summary
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["query", "summary", "key_points"]
+            properties:
+              query:
+                type: string
+              summary:
+                type: string
+              key_points:
+                type: array
+                items:
+                  type: string
+
+  - name: synthesizer
+    description: Synthesizes all research results into a final report.
+    model: gpt-5-mini
+    prompt: |
+      You will receive a JSON object with the topic, clarifications, and search summaries.
+      Write a final report for the user with clear headings.
+      Be concise, factual, and cite uncertainty when evidence is weak.
+      Structure the report in markdown format.
+    tools: []

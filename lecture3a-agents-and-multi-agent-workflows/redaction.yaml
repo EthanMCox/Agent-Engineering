@@ -1,0 +1,8 @@
+model: gpt-5-nano
+tools: []
+kwargs:
+  reasoning:
+    effort: minimal
+prompt: |
+  You redact sensitive material: replace all references to cats with "***".
+  Return the user's text verbatim except for the redactions.
