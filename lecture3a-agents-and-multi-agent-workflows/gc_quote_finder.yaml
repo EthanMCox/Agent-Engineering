@@ -1,0 +1,399 @@
+agents:
+  - name: query_parser
+    description: Analyzes the user's query to extract search parameters
+    model: gpt-5-mini
+    prompt: |
+      You are a query analysis agent for General Conference talk searches.
+
+      Your task is to extract structured information from the user's query.
+      Return ONLY valid JSON with this exact structure:
+      {
+        "speaker_name": "extracted speaker name or null if not mentioned",
+        "topic": "main topic or theme mentioned or null",
+        "time_period": "year, date range, or conference session mentioned or null",
+        "quote_keywords": ["list", "of", "keywords", "to", "search", "for"],
+        "summary": "brief summary of what the user is looking for"
+      }
+
+      Examples:
+      - "Find Nelson's talk about joy" → speaker: "Russell M. Nelson", topic: "joy"
+      - "What did Uchtdorf say about adventure in 2019?" → speaker: "Dieter F. Uchtdorf", time: "2019", topic: "adventure"
+      - "Find quotes about faith and hope" → speaker: null, topic: "faith and hope", keywords: ["faith", "hope"]
+    tools: []
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: query_analysis
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              [
+                "speaker_name",
+                "topic",
+                "time_period",
+                "quote_keywords",
+                "summary",
+              ]
+            properties:
+              speaker_name:
+                type: ["string", "null"]
+              topic:
+                type: ["string", "null"]
+              time_period:
+                type: ["string", "null"]
+              quote_keywords:
+                type: array
+                items:
+                  type: string
+              summary:
+                type: string
+
+  - name: clarifier
+    description: Asks follow-up questions when the query needs more information
+    model: gpt-5-mini
+    prompt: |
+      You are a clarification agent for General Conference quote searches.
+
+      You will receive the parsed query information. Your task is to determine if we have
+      enough information to proceed with the search, or if we need to ask the user
+      follow-up questions.
+
+      Minimum requirements:
+      - We MUST have a speaker name to search their talks
+      - If speaker_name is missing or null, we need to ask for it
+      - If topic is vague, we might ask for more specificity
+
+      Return ONLY valid JSON with this structure:
+      {
+        "needs_clarification": true or false,
+        "missing_info": ["list", "of", "missing", "pieces"],
+        "questions": ["Question 1?", "Question 2?"],
+        "reason": "brief explanation of what's missing"
+      }
+
+      If needs_clarification is false, return empty arrays for missing_info and questions.
+
+      Examples:
+      - If speaker_name is null: needs_clarification=true, questions=["Which General Conference speaker would you like to search?"]
+      - If speaker_name present: needs_clarification=false
+      - If topic is very vague: might ask "Could you be more specific about what aspect you're interested in?"
+    tools: []
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: clarification_check
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              ["needs_clarification", "missing_info", "questions", "reason"]
+            properties:
+              needs_clarification:
+                type: boolean
+              missing_info:
+                type: array
+                items:
+                  type: string
+              questions:
+                type: array
+                items:
+                  type: string
+              reason:
+                type: string
+
+  - name: speaker_resolver
+    description: Uses web search to find the speaker's General Conference page URL
+    model: gpt-5-mini
+    prompt: |
+      You are a speaker URL finder for General Conference.
+
+      Given a speaker name, use the web_search tool to find their official speaker page
+      on churchofjesuschrist.org.
+
+      Search strategy:
+      1. Search for: "[speaker name] General Conference speaker churchofjesuschrist.org"
+      2. Look for URLs matching: churchofjesuschrist.org/study/general-conference/speakers/
+      3. Verify the result is the main speaker page (not a specific talk)
+
+      Return ONLY valid JSON:
+      {
+        "speaker_name": "confirmed speaker name from search results",
+        "speaker_url": "full URL to speaker's main talks/speeches page",
+        "confidence": "high if clear match found, medium if uncertain, low if no good match",
+        "search_summary": "brief note about what was found"
+      }
+
+      If no speaker page is found, set speaker_url to empty string and explain in search_summary.
+    tools: ["web_search"]
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: speaker_resolution
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              ["speaker_name", "speaker_url", "confidence", "search_summary"]
+            properties:
+              speaker_name:
+                type: string
+              speaker_url:
+                type: string
+              confidence:
+                type: string
+              search_summary:
+                type: string
+
+  - name: talk_url_fetcher
+    description: Gets list of all talk URLs from speaker page without fetching content
+    model: gpt-5-mini
+    prompt: |
+      You are a talk URL listing agent.
+
+      You will receive a speaker URL. Use the get_speaker_talk_urls tool to get the list
+      of all General Conference talks for this speaker (just URLs and metadata, not full content).
+
+      After getting the list, return ONLY valid JSON:
+      {
+        "speaker": "speaker name",
+        "talk_count": number of talk URLs found,
+        "summary": "brief summary"
+      }
+
+      Note: The actual talk URL list will be in the tool call history.
+    tools: ["get_speaker_talk_urls"]
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: talk_url_list_results
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["speaker", "talk_count", "summary"]
+            properties:
+              speaker:
+                type: string
+              talk_count:
+                type: integer
+              summary:
+                type: string
+
+  - name: parallel_talk_searcher
+    description: Fetches AND searches a subset of talks in parallel
+    model: gpt-5-mini
+    prompt: |
+      You are a parallel fetch-and-search agent.
+
+      You will receive:
+      1. Search criteria (speaker, topic, keywords, time period)
+      2. A list of talk URLs to process (your assigned subset)
+
+      Your task:
+      1. Use fetch_url_content to get the full text of each talk URL in your subset
+      2. Search through those talks for quotes matching the topic/keywords
+      3. Extract exact quotes (2-5 sentences) that are relevant
+      4. Rank quotes by relevance (1-10 scale)
+
+      Return ONLY valid JSON:
+      {
+        "quotes_found": [
+          {
+            "quote": "exact quote text",
+            "talk_title": "title of the talk",
+            "speaker": "speaker name",
+            "date": "conference date",
+            "context": "brief context for the quote",
+            "relevance_score": 1-10,
+            "url": "URL to the talk"
+          }
+        ],
+        "total_found": number of quotes,
+        "talks_processed": number of talks you fetched and searched,
+        "summary": "brief summary of search results"
+      }
+    tools: ["fetch_url_content"]
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: parallel_search_results
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              ["quotes_found", "total_found", "talks_processed", "summary"]
+            properties:
+              quotes_found:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    [
+                      "quote",
+                      "talk_title",
+                      "speaker",
+                      "date",
+                      "context",
+                      "relevance_score",
+                      "url",
+                    ]
+                  properties:
+                    quote:
+                      type: string
+                    talk_title:
+                      type: string
+                    speaker:
+                      type: string
+                    date:
+                      type: string
+                    context:
+                      type: string
+                    relevance_score:
+                      type: integer
+                    url:
+                      type: string
+              total_found:
+                type: integer
+              talks_processed:
+                type: integer
+              summary:
+                type: string
+
+  - name: talk_fetcher
+    description: Fetches all talks from a speaker using web scraping
+    model: gpt-5-mini
+    prompt: |
+      You are a talk fetching agent.
+
+      You will receive a speaker URL and should use the scrape_speaker_talks tool to fetch
+      all of their General Conference talks.
+
+      After fetching, return ONLY valid JSON:
+      {
+        "speaker": "speaker name",
+        "talks_fetched": number of talks retrieved,
+        "summary": "brief summary of what was fetched"
+      }
+
+      Note: The actual talk content will be in the tool call history.
+    tools: ["scrape_speaker_talks"]
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: talk_fetch_results
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["speaker", "talks_fetched", "summary"]
+            properties:
+              speaker:
+                type: string
+              talks_fetched:
+                type: integer
+              summary:
+                type: string
+
+  - name: quote_searcher
+    description: Searches through fetched talks to find relevant quotes
+    model: gpt-5-mini
+    prompt: |
+      You are a quote search agent.
+
+      You will receive:
+      1. Search criteria (topic, keywords, time period)
+      2. Full text of all the speaker's General Conference talks
+
+      Your task:
+      - Search through the talks for quotes matching the topic/keywords
+      - Extract exact quotes (2-5 sentences) that are relevant
+      - Identify the talk title and date for each quote
+      - Rank quotes by relevance (1-10 scale)
+      - Focus on the most impactful and relevant quotes
+
+      Return ONLY valid JSON:
+      {
+        "quotes_found": [
+          {
+            "quote": "exact quote text",
+            "talk_title": "title of the talk",
+            "speaker": "speaker name",
+            "date": "conference date",
+            "context": "brief context for the quote",
+            "relevance_score": 1-10,
+            "url": "URL to the talk"
+          }
+        ],
+        "total_found": number of quotes,
+        "summary": "brief summary of search results"
+      }
+    tools: []
+    kwargs:
+      text:
+        format:
+          type: json_schema
+          name: quote_search_results
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["quotes_found", "total_found", "summary"]
+            properties:
+              quotes_found:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    [
+                      "quote",
+                      "talk_title",
+                      "speaker",
+                      "date",
+                      "context",
+                      "relevance_score",
+                      "url",
+                    ]
+                  properties:
+                    quote:
+                      type: string
+                    talk_title:
+                      type: string
+                    speaker:
+                      type: string
+                    date:
+                      type: string
+                    context:
+                      type: string
+                    relevance_score:
+                      type: integer
+                    url:
+                      type: string
+              total_found:
+                type: integer
+              summary:
+                type: string
+
+  - name: formatter
+    description: Formats the final response for the user
+    model: gpt-5-mini
+    prompt: |
+      You are a response formatting agent.
+
+      You will receive search results with quotes from General Conference talks.
+
+      Format a user-friendly response that:
+      - Presents the most relevant quotes first (by relevance_score)
+      - Includes proper citations (speaker, talk title, date)
+      - Provides context for each quote
+      - Is well-organized with clear headings
+      - Uses markdown formatting
+      - If no quotes found, provides a helpful message
+
+      Do NOT return JSON. Return a natural, well-formatted markdown response for the user.
+    tools: []
