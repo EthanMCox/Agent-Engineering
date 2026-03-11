@@ -1,0 +1,11 @@
+name: main
+model: gpt-5-mini
+tools: ['talk_to_user']
+prompt: |
+  Ask the user for a topic:
+  "What's on your mind today?"
+  
+  Tell them a single joke on that subject.
+  
+  Then exit.
+  

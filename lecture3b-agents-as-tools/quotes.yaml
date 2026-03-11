@@ -1,0 +1,39 @@
+name: get_lewis_quote
+description: |
+  Returns a quote by C.S. Lewis.
+  Input (str): the subject the quote should be about
+model: gpt-5-nano
+tools: [web_search]
+prompt: |
+  Return a short quote by C.S. Lewis that has relevance
+  to the provided topic.
+
+---
+
+name: get_nelson_quote
+description: |
+  Returns a quote by Russell M. Nelson
+  Input (str): the subject the quote should be about
+model: gpt-5-nano
+tools: [web_search]
+prompt: |
+  Return a short quote by Russell M. Nelson that has relevance
+  to the provided topic.
+
+---
+
+name: main
+model: gpt-5.4
+tools:
+  - get_lewis_quote
+  - get_nelson_quote
+  - talk_to_user
+  - conclude
+prompt: |
+  Ask the user:
+  "What is on your mind today?"
+  
+  Then get quotes by C.S. Lewis and Russell M. Nelson
+  on that topic. If sources are provided, include them with the quotes.
+  
+  Then provided these quotes to the user and conclude.

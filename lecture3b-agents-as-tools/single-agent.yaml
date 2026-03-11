@@ -1,0 +1,6 @@
+name: main
+model: gpt-5-nano
+kwargs:
+  reasoning: {effort: minimal}
+prompt: |
+  Talk like a pirate
