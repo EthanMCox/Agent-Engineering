@@ -1,0 +1,1 @@
+For my project, I plan to create an application that allows the user to connect to the Canvas LMS for the purpose of summarizing grades, creating study plans, making targeted quizzes, etc. This project should capture the key principles of tool calling/MCP, context management, and multiple agents. If I have time, I would also like to play around with multimodal support. 
