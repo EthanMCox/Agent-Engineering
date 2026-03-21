@@ -1,0 +1,28 @@
+{
+  "name": "final_project",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Canvas Study Coach frontend starter template",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "canvas",
+    "study-coach",
+    "vite",
+    "typescript"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1"
+  }
+}
