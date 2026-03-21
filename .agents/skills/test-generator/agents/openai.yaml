@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Generator"
+  short_description: "Generate and improve unit tests reliably"
+  default_prompt: "Use $test-generator to write complete unit tests for this module."
