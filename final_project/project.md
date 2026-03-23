@@ -84,7 +84,9 @@ The initial frontend scaffold is now set up in `final_project/` using vanilla HT
   - Study Plan
   - Quiz Generator
   - Course Context / Sources
-- Chat placeholder panel with local echo behavior for UI validation
+- Chat panel connected to a basic FastAPI backend
+- Per-session chat memory (session ID stored in browser `localStorage`)
+- Reset chat control wired to backend memory reset endpoint
 - Basic responsive styling for desktop/mobile
 - Initial TypeScript interfaces:
   - `DashboardFeature`
@@ -94,4 +96,9 @@ The initial frontend scaffold is now set up in `final_project/` using vanilla HT
 - Canvas API or MCP integration
 - RAG/context retrieval pipeline
 - Multi-agent orchestration
-- Real LLM-backed chat responses
+- Advanced guardrails and production chat reliability features
+
+### Local Run Commands
+- Frontend: `npm run dev`
+- Backend setup: `python -m pip install -r backend/requirements.txt`
+- Backend run: `python -m uvicorn backend.app:app --reload --port 8000`

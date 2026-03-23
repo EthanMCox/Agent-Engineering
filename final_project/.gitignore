@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+.venv/
+venv/
 
 # Build output
 dist/
@@ -19,6 +21,10 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
 
 # IDE/editor files
 .vscode/
