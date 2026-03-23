@@ -102,3 +102,34 @@ The initial frontend scaffold is now set up in `final_project/` using vanilla HT
 - Frontend: `npm run dev`
 - Backend setup: `python -m pip install -r backend/requirements.txt`
 - Backend run: `python -m uvicorn backend.app:app --reload --port 8000`
+
+---
+
+## Canvas MCP Sidecar Runbook
+
+### Sidecar Package Location
+- Canvas MCP dependencies are isolated in `final_project/mcp-canvas/`.
+- Frontend dependencies remain in `final_project/package.json`.
+
+### One-Time Setup
+1. Install frontend deps (already used by Vite):
+   - `npm install`
+2. Install Canvas MCP sidecar deps:
+   - `npm --prefix .\mcp-canvas install`
+3. Install backend deps:
+   - `python -m pip install -r backend/requirements.txt`
+
+### Environment Variables
+- In `.env`, configure:
+  - `CANVAS_MCP_ENABLED=true`
+  - `CANVAS_API_TOKEN=<canvas token>`
+  - `CANVAS_DOMAIN=<school>.instructure.com`
+- Optional overrides:
+  - `CANVAS_MCP_COMMAND` (defaults to `npx canvas-mcp-server`)
+  - `CANVAS_MCP_WORKDIR` (defaults to `.\mcp-canvas`)
+  - `CANVAS_MCP_STARTUP_TIMEOUT_SECONDS` (defaults to `15`)
+
+### Startup Model
+- Preferred: backend manages MCP sidecar lifecycle automatically on startup.
+- Diagnostics only: run sidecar manually with
+  - `npm --prefix .\mcp-canvas run start`

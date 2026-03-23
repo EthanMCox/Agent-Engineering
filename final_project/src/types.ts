@@ -16,6 +16,14 @@ export interface ChatApiResponse {
   format?: string
   model: string
   usage?: Record<string, unknown>
+  sources?: ChatSource[]
+}
+
+export interface ChatSource {
+  source_type: string
+  source_id: string
+  label: string
+  details: string
 }
 
 export interface ChatMessage {

@@ -1,0 +1,17 @@
+{
+  "name": "canvas-mcp-sidecar",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Dedicated sidecar package for Canvas MCP server used by Python backend",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "canvas-mcp-server",
+    "start:debug": "canvas-mcp-server"
+  },
+  "dependencies": {
+    "canvas-mcp-server": "^2.2.3"
+  }
+}

@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import time
+from contextlib import asynccontextmanager
 from typing import Any
 from typing import Literal
 
@@ -11,6 +12,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
+
+from .canvas_context import CanvasSource
+from .canvas_context import build_canvas_prompt_context
+from .mcp_client import CanvasMCPClient
 
 SYSTEM_PROMPT = (
     "You are a helpful study assistant for a student web app. "
@@ -50,6 +55,7 @@ class ChatResponse(BaseModel):
     format: Literal["markdown"] = "markdown"
     model: str
     usage: dict[str, Any] | None = None
+    sources: list[dict[str, str]] | None = None
 
 
 class ResetRequest(BaseModel):
@@ -63,9 +69,26 @@ class ResetResponse(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     model: str
+    mcp_canvas_ok: bool
+    mcp_canvas_enabled: bool
+    mcp_canvas_error: str | None = None
 
 
-app = FastAPI(title="Canvas Study Coach Chat API", version="0.1.0")
+canvas_mcp_client = CanvasMCPClient()
+
+
+@asynccontextmanager
+async def app_lifespan(_: FastAPI):
+    if canvas_mcp_client.enabled:
+        try:
+            await canvas_mcp_client.start()
+        except Exception as exc:
+            logger.exception("Canvas MCP failed to start during app startup: %s", exc)
+    yield
+    await canvas_mcp_client.stop()
+
+
+app = FastAPI(title="Canvas Study Coach Chat API", version="0.1.0", lifespan=app_lifespan)
 
 allowed_origins = os.getenv(
     "CORS_ORIGINS",
@@ -147,10 +170,71 @@ def trim_history(history: list[dict[str, str]]) -> list[dict[str, str]]:
     return [system_message, *turns]
 
 
+def _source_to_dict(source: CanvasSource) -> dict[str, str]:
+    return {
+        "source_type": source.source_type,
+        "source_id": source.source_id,
+        "label": source.label,
+        "details": source.details,
+    }
+
+
+def _extract_candidate_course_ids(tool_result: Any, limit: int = 3) -> list[int]:
+    content = getattr(tool_result, "content", None)
+    if not content or not isinstance(content, list):
+        return []
+
+    ids: list[int] = []
+    seen: set[int] = set()
+    for item in content:
+        text = getattr(item, "text", "")
+        if not isinstance(text, str):
+            continue
+        for match in re.finditer(r"\|\s*(\d{2,})\s*\|", text):
+            value = int(match.group(1))
+            if value in seen:
+                continue
+            seen.add(value)
+            ids.append(value)
+            if len(ids) >= limit:
+                return ids
+    return ids
+
+
+async def build_optional_canvas_context() -> tuple[str | None, list[dict[str, str]]]:
+    if not canvas_mcp_client.enabled:
+        return None, []
+
+    try:
+        courses_result = await canvas_mcp_client.list_courses()
+        assignment_results: dict[str, Any] = {}
+        for course_id in _extract_candidate_course_ids(courses_result, limit=3):
+            try:
+                assignment_results[str(course_id)] = await canvas_mcp_client.list_assignments(course_id=course_id, limit=8)
+            except Exception:
+                continue
+
+        context = build_canvas_prompt_context(
+            courses_result=courses_result,
+            assignments_by_course=assignment_results,
+        )
+        return context.prompt_context, [_source_to_dict(src) for src in context.sources]
+    except Exception as exc:
+        logger.warning("Canvas context unavailable for this request: %s", exc)
+        return None, []
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     logger.debug("Health check requested")
-    return HealthResponse(ok=True, model=active_model())
+    mcp_health = await canvas_mcp_client.health()
+    return HealthResponse(
+        ok=True,
+        model=active_model(),
+        mcp_canvas_ok=mcp_health.connected,
+        mcp_canvas_enabled=mcp_health.enabled,
+        mcp_canvas_error=mcp_health.last_error,
+    )
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -188,9 +272,25 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             selected_model,
             len(history),
         )
+        canvas_context, sources = await build_optional_canvas_context()
+        request_history = history
+        if canvas_context:
+            request_history = [
+                history[0],
+                {
+                    "role": "system",
+                    "content": (
+                        "Use this Canvas grounding context when answering. "
+                        "If context conflicts with prior assumptions, prefer the Canvas context.\n\n"
+                        f"{canvas_context}"
+                    ),
+                },
+                *history[1:],
+            ]
+
         response = await client.responses.create(
             model=selected_model,
-            input=history,
+            input=request_history,
         )
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info("Model call completed session=%s latency_ms=%d", masked_session_id, elapsed_ms)
@@ -240,6 +340,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         format="markdown",
         model=active_model(),
         usage=usage,
+        sources=sources if sources else None,
     )
 
 
