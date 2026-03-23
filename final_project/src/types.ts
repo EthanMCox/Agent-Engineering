@@ -10,16 +10,10 @@ export interface DashboardFeature {
 export type ChatRole = 'assistant' | 'user' | 'error'
 export type MessageState = 'complete' | 'pending'
 
-export type ContentBlock =
-  | { type: 'paragraph'; text: string }
-  | { type: 'list'; items: string[] }
-  | { type: 'code'; language: string; code: string }
-  | { type: 'markdown'; text: string }
-
 export interface ChatApiResponse {
-  reply: string
-  content_blocks?: ContentBlock[]
-  format?: 'markdown' | 'blocks'
+  markdown?: string
+  content_type?: string
+  format?: string
   model: string
   usage?: Record<string, unknown>
 }
@@ -30,5 +24,5 @@ export interface ChatMessage {
   text: string
   timestamp: string
   state?: MessageState
-  contentBlocks?: ContentBlock[]
+  markdown?: string
 }

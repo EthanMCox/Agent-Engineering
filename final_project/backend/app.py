@@ -17,8 +17,9 @@ SYSTEM_PROMPT = (
     "Be concise, honest, and practical. "
     "If you are unsure, clearly say so instead of making up facts. "
     "Format answers cleanly: use short paragraphs, bullet lists when helpful, and fenced code blocks only when needed. "
-    "Output markdown only. Do not output raw HTML, CSS, JavaScript, or inline style attributes. "
-    "If a user asks for color/styling that requires CSS, explain that the app controls colors and provide the content in markdown. "
+    "Output markdown only. Do not output raw renderable HTML, CSS, JavaScript, or inline style attributes. "
+    "If a user asks for HTML/CSS/JS examples, provide them inside fenced code blocks (for example, ```html ... ```), not as renderable markup. "
+    "If a user asks for color/styling that requires CSS, provide CSS as a fenced code block and explain briefly. "
     "You may use markdown formatting such as headings, bold, italics, lists, blockquotes, and inline code."
 )
 DEFAULT_MODEL = "gpt-5-nano"
@@ -44,35 +45,11 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    reply: str
-    content_blocks: list["ContentBlock"]
-    format: Literal["markdown", "blocks"] = "markdown"
+    markdown: str
+    content_type: Literal["text/markdown"] = "text/markdown"
+    format: Literal["markdown"] = "markdown"
     model: str
     usage: dict[str, Any] | None = None
-
-
-class ParagraphBlock(BaseModel):
-    type: Literal["paragraph"]
-    text: str
-
-
-class ListBlock(BaseModel):
-    type: Literal["list"]
-    items: list[str]
-
-
-class CodeBlock(BaseModel):
-    type: Literal["code"]
-    language: str
-    code: str
-
-
-class MarkdownBlock(BaseModel):
-    type: Literal["markdown"]
-    text: str
-
-
-ContentBlock = ParagraphBlock | ListBlock | CodeBlock | MarkdownBlock
 
 
 class ResetRequest(BaseModel):
@@ -141,18 +118,18 @@ def normalize_output_format(text: str) -> str:
     if not stripped:
         return stripped
 
-    # Avoid rendering raw HTML payloads from model output; keep response markdown-safe.
-    if re.search(r"<\s*(?:div|span|p|h[1-6]|ul|ol|li|strong|em|style|script|table)\b", stripped, re.IGNORECASE):
-        logger.warning("Model returned HTML-like content; converting response to markdown-safe fallback")
+    # Convert HTML-like output to fenced code so examples display safely without rendering.
+    contains_html_like = re.search(
+        r"<\s*(?:div|span|p|h[1-6]|ul|ol|li|strong|em|style|script|table|section|article|header|footer|main|aside|a|img|button|input|form)\b",
+        stripped,
+        re.IGNORECASE,
+    )
+    has_code_fence = re.search(r"```[a-zA-Z0-9_-]*\n", stripped) is not None
+    if contains_html_like and not has_code_fence:
+        logger.warning("Model returned HTML-like content without code fences; wrapping as fenced html block")
         return (
-            "I can format with markdown (headings, bold, italics, lists), "
-            "but I cannot directly set text color from the model response.\n\n"
-            "### Example\n"
-            "- Avocado Toast\n"
-            "- **Blueberries**\n"
-            "- Quinoa Salad\n"
-            "- *Sushi*\n"
-            "- Spaghetti Bolognese"
+            "Here is the HTML example as code (displayed safely, not rendered):\n\n"
+            f"```html\n{stripped}\n```"
         )
 
     return stripped
@@ -168,64 +145,6 @@ def trim_history(history: list[dict[str, str]]) -> list[dict[str, str]]:
     if len(turns) > max_messages:
         turns = turns[-max_messages:]
     return [system_message, *turns]
-
-
-def parse_content_blocks(text: str) -> list[ContentBlock]:
-    clean_text = text.strip()
-    if not clean_text:
-        return [ParagraphBlock(type="paragraph", text="I could not generate a response. Please try again.")]
-
-    blocks: list[ContentBlock] = []
-    code_pattern = re.compile(r"```([A-Za-z0-9_-]+)?\n(.*?)```", re.DOTALL)
-    cursor = 0
-
-    for match in code_pattern.finditer(clean_text):
-        pre_code_segment = clean_text[cursor : match.start()]
-        _parse_non_code_segment(pre_code_segment, blocks)
-
-        language = (match.group(1) or "text").strip() or "text"
-        code = match.group(2).strip("\n")
-        blocks.append(CodeBlock(type="code", language=language, code=code))
-        cursor = match.end()
-
-    tail_segment = clean_text[cursor:]
-    _parse_non_code_segment(tail_segment, blocks)
-
-    if not blocks:
-        return [ParagraphBlock(type="paragraph", text=clean_text)]
-
-    return blocks
-
-
-def _parse_non_code_segment(segment: str, blocks: list[ContentBlock]) -> None:
-    normalized = segment.replace("\r\n", "\n").replace("\r", "\n").strip()
-    if not normalized:
-        return
-
-    chunks = re.split(r"\n\s*\n+", normalized)
-    for chunk in chunks:
-        lines = [line.rstrip() for line in chunk.split("\n") if line.strip()]
-        if not lines:
-            continue
-
-        if all(_is_list_line(line) for line in lines):
-            items = [_strip_list_prefix(line).strip() for line in lines]
-            items = [item for item in items if item]
-            if items:
-                blocks.append(ListBlock(type="list", items=items))
-            continue
-
-        paragraph_text = "\n".join(lines).strip()
-        if paragraph_text:
-            blocks.append(ParagraphBlock(type="paragraph", text=paragraph_text))
-
-
-def _is_list_line(line: str) -> bool:
-    return re.match(r"^\s*(?:[-*]\s+|\d+\.\s+)", line) is not None
-
-
-def _strip_list_prefix(line: str) -> str:
-    return re.sub(r"^\s*(?:[-*]\s+|\d+\.\s+)", "", line)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -287,8 +206,6 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     if not assistant_text:
         assistant_text = "I could not generate a response. Please try again."
         logger.warning("Model returned empty output; fallback message used session=%s", masked_session_id)
-    content_blocks: list[ContentBlock] = [MarkdownBlock(type="markdown", text=assistant_text)]
-
     history.append({"role": "assistant", "content": assistant_text})
     pre_trim_count = len(history)
     trimmed_history = trim_history(history)
@@ -318,8 +235,8 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     )
 
     return ChatResponse(
-        reply=assistant_text,
-        content_blocks=content_blocks,
+        markdown=assistant_text,
+        content_type="text/markdown",
         format="markdown",
         model=active_model(),
         usage=usage,

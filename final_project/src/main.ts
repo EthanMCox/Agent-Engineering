@@ -1,10 +1,18 @@
 ﻿import './style.css'
-import type { ChatApiResponse, ChatMessage, ContentBlock, DashboardFeature } from './types'
+import DOMPurify from 'dompurify'
+import MarkdownIt from 'markdown-it'
+import type { ChatApiResponse, ChatMessage, DashboardFeature } from './types'
 
 type AppSection = 'dashboard' | 'chat'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 const SESSION_STORAGE_KEY = 'canvas-study-coach-session-id'
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+  typographer: true,
+})
 
 const FEATURES: DashboardFeature[] = [
   {
@@ -179,15 +187,16 @@ async function handleChatSubmit(event: SubmitEvent): Promise<void> {
     }
 
     const payload = (await response.json()) as ChatApiResponse
+    const rendered = resolveRenderedMessage(payload)
     messages = messages.map((message) =>
       message.id === pendingId
         ? createMessage(
             'assistant',
-            payload.reply,
+            rendered.fallbackText,
             new Date().toLocaleTimeString(),
             'complete',
             pendingId,
-            payload.content_blocks ?? undefined,
+            rendered.markdown,
           )
         : message,
     )
@@ -245,7 +254,7 @@ function createMessage(
   timestamp: string,
   state: ChatMessage['state'] = 'complete',
   id: string = crypto.randomUUID(),
-  contentBlocks?: ContentBlock[],
+  markdown?: string,
 ): ChatMessage {
   return {
     id,
@@ -253,7 +262,7 @@ function createMessage(
     text,
     timestamp,
     state,
-    contentBlocks,
+    markdown,
   }
 }
 
@@ -277,107 +286,61 @@ async function safeJson(response: Response): Promise<unknown | null> {
 }
 
 function renderMessageBody(message: ChatMessage): string {
-  if (message.contentBlocks && message.contentBlocks.length > 0) {
-    return message.contentBlocks.map(renderBlock).join('')
+  if (message.markdown) {
+    return renderMarkdown(message.markdown)
+  }
+
+  if (!message.text.trim()) {
+    return '<p></p>'
   }
 
   return `<p>${escapeHtml(message.text).replace(/\n/g, '<br />')}</p>`
 }
 
-function renderBlock(block: ContentBlock): string {
-  if (block.type === 'markdown') {
-    return renderMarkdown(block.text)
-  }
-
-  if (block.type === 'paragraph') {
-    return `<p>${renderInlineMarkdown(block.text).replace(/\n/g, '<br />')}</p>`
-  }
-
-  if (block.type === 'list') {
-    const items = block.items.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join('')
-    return `<ul>${items}</ul>`
-  }
-
-  return `<pre><code class="language-${escapeHtml(block.language)}">${escapeHtml(block.code)}</code></pre>`
+function renderMarkdown(content: string): string {
+  const html = markdown.render(content)
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'p',
+      'br',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'ul',
+      'ol',
+      'li',
+      'blockquote',
+      'pre',
+      'code',
+      'strong',
+      'em',
+      'a',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'th',
+      'td',
+      'hr',
+    ],
+    ALLOWED_ATTR: ['href', 'title'],
+    ALLOW_DATA_ATTR: false,
+  })
 }
 
-function renderMarkdown(markdown: string): string {
-  const normalized = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
-  if (!normalized) {
-    return '<p></p>'
+function resolveRenderedMessage(payload: ChatApiResponse): { markdown?: string; fallbackText: string } {
+  const isMarkdownContract = payload.content_type === 'text/markdown' && payload.format === 'markdown'
+  if (isMarkdownContract && typeof payload.markdown === 'string' && payload.markdown.trim()) {
+    return {
+      markdown: payload.markdown,
+      fallbackText: payload.markdown,
+    }
   }
 
-  const parts: string[] = []
-  const codePattern = /```([A-Za-z0-9_-]+)?\n([\s\S]*?)```/g
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = codePattern.exec(normalized)) !== null) {
-    const before = normalized.slice(lastIndex, match.index)
-    parts.push(renderMarkdownTextBlocks(before))
-
-    const language = escapeHtml((match[1] ?? 'text').trim() || 'text')
-    const code = escapeHtml(match[2].replace(/\n$/, ''))
-    parts.push(`<pre><code class="language-${language}">${code}</code></pre>`)
-    lastIndex = match.index + match[0].length
-  }
-
-  parts.push(renderMarkdownTextBlocks(normalized.slice(lastIndex)))
-  return parts.filter(Boolean).join('')
-}
-
-function renderMarkdownTextBlocks(segment: string): string {
-  const chunks = segment
-    .split(/\n\s*\n+/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean)
-
-  return chunks
-    .map((chunk) => {
-      const lines = chunk.split('\n').map((line) => line.trimEnd())
-      if (!lines.length) {
-        return ''
-      }
-
-      if (lines.every((line) => /^\s*[-*]\s+/.test(line))) {
-        const items = lines
-          .map((line) => line.replace(/^\s*[-*]\s+/, ''))
-          .map((item) => `<li>${renderInlineMarkdown(item)}</li>`)
-          .join('')
-        return `<ul>${items}</ul>`
-      }
-
-      if (lines.every((line) => /^\s*\d+\.\s+/.test(line))) {
-        const items = lines
-          .map((line) => line.replace(/^\s*\d+\.\s+/, ''))
-          .map((item) => `<li>${renderInlineMarkdown(item)}</li>`)
-          .join('')
-        return `<ol>${items}</ol>`
-      }
-
-      const heading = lines[0].match(/^(#{1,6})\s+(.*)$/)
-      if (heading) {
-        const level = heading[1].length
-        const text = renderInlineMarkdown(heading[2])
-        return `<h${level}>${text}</h${level}>`
-      }
-
-      if (lines.every((line) => /^>\s?/.test(line))) {
-        const text = lines.map((line) => line.replace(/^>\s?/, '')).join('\n')
-        return `<blockquote>${renderInlineMarkdown(text).replace(/\n/g, '<br />')}</blockquote>`
-      }
-
-      return `<p>${renderInlineMarkdown(lines.join('\n')).replace(/\n/g, '<br />')}</p>`
-    })
-    .join('')
-}
-
-function renderInlineMarkdown(value: string): string {
-  const escaped = escapeHtml(value)
-  return escaped
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  return { fallbackText: 'Received unsupported response format from server.' }
 }
 
 function escapeHtml(value: string): string {
