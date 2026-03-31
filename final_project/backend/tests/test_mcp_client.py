@@ -6,17 +6,25 @@ import pytest
 
 from backend.mcp_client import CanvasMCPClient
 from backend.mcp_client import MCP_IMPORT_ERROR
+from backend.settings import build_settings
 
 
 def test_mcp_client_reports_disabled_by_default(monkeypatch) -> None:
     monkeypatch.delenv("CANVAS_MCP_ENABLED", raising=False)
-    client = CanvasMCPClient()
+    settings = build_settings({})
+    client = CanvasMCPClient(settings=settings)
     assert client.enabled is False
 
 
 def test_mcp_client_start_fails_cleanly_when_enabled_but_missing_dependency(monkeypatch) -> None:
-    monkeypatch.setenv("CANVAS_MCP_ENABLED", "true")
-    client = CanvasMCPClient()
+    settings = build_settings(
+        {
+            "CANVAS_MCP_ENABLED": "true",
+            "CANVAS_API_TOKEN": "token",
+            "CANVAS_DOMAIN": "school.instructure.com",
+        }
+    )
+    client = CanvasMCPClient(settings=settings)
 
     if MCP_IMPORT_ERROR is None:
         pytest.skip("mcp is installed in this environment; missing-dependency case not applicable.")

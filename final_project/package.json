@@ -2,7 +2,7 @@
   "name": "final_project",
   "private": true,
   "version": "0.1.0",
-  "description": "Canvas Study Coach frontend starter template",
+  "description": "Canvas Study Coach final project web application",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -28,6 +28,15 @@ def _to_text(value: Any) -> str:
 
 
 def _extract_rows(tool_result: Any) -> list[dict[str, Any]]:
+    structured = getattr(tool_result, "structured_content", None)
+    if isinstance(structured, dict):
+        for key in ("courses", "items", "assignments", "data"):
+            value = structured.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    if isinstance(structured, list):
+        return [item for item in structured if isinstance(item, dict)]
+
     content = getattr(tool_result, "content", None)
     if not content or not isinstance(content, list):
         return []
@@ -40,11 +49,43 @@ def _extract_rows(tool_result: Any) -> list[dict[str, Any]]:
         for line in text.splitlines():
             # The canvas-mcp-server tools often return markdown tables.
             # Keep this parser forgiving so we still extract context from plain text responses.
-            if "|" in line:
-                rows.append({"raw": line.strip()})
-            else:
-                rows.append({"raw": line.strip()})
+            rows.append({"raw": line.strip()})
     return rows
+
+
+def extract_course_ids(tool_result: Any, limit: int) -> list[int]:
+    ids: list[int] = []
+    seen: set[int] = set()
+
+    for row in _extract_rows(tool_result):
+        value = row.get("id")
+        try:
+            if value is None:
+                continue
+            course_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if course_id in seen:
+            continue
+        seen.add(course_id)
+        ids.append(course_id)
+        if len(ids) >= limit:
+            return ids
+
+    # Fallback: parse markdown/plain-text rows.
+    for row in _extract_rows(tool_result):
+        raw = _to_text(row.get("raw"))
+        for part in raw.split("|"):
+            piece = part.strip()
+            if piece.isdigit():
+                course_id = int(piece)
+                if course_id in seen:
+                    continue
+                seen.add(course_id)
+                ids.append(course_id)
+                if len(ids) >= limit:
+                    return ids
+    return ids
 
 
 def build_canvas_prompt_context(

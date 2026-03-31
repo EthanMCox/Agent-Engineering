@@ -19,25 +19,25 @@ const FEATURES: DashboardFeature[] = [
     id: 'grades',
     title: 'Grade Summary',
     description: 'Review current grade signals, missing work, and class-level trends.',
-    status: 'coming-soon',
+    status: 'in-progress',
   },
   {
     id: 'plan',
     title: 'Study Plan',
     description: 'Generate a daily or weekly plan based on deadlines and available time.',
-    status: 'coming-soon',
+    status: 'in-progress',
   },
   {
     id: 'quiz',
     title: 'Quiz Generator',
     description: 'Create targeted practice questions from weak topics and past mistakes.',
-    status: 'coming-soon',
+    status: 'in-progress',
   },
   {
     id: 'context',
     title: 'Course Context / Sources',
     description: 'View citation-backed context from Canvas content and local study materials.',
-    status: 'coming-soon',
+    status: 'in-progress',
   },
 ]
 
@@ -45,7 +45,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: crypto.randomUUID(),
     role: 'assistant',
-    text: 'Chat backend is active for basic context-aware responses. MCP, RAG, and multi-agent features are not connected yet.',
+    text: 'Welcome to Canvas Study Coach. Ask for study priorities, assignment planning, or quiz practice and I will respond with grounded, course-aware guidance when available.',
     timestamp: new Date().toLocaleTimeString(),
     state: 'complete',
   },
@@ -79,9 +79,9 @@ function render(): void {
       <header class="topbar">
         <div>
           <p class="eyebrow">Canvas Study Coach</p>
-          <h1>Frontend Starter</h1>
+          <h1>Student Workspace</h1>
         </div>
-        <span class="badge">Template Mode</span>
+        <span class="badge">Final Project Build</span>
       </header>
 
       <nav class="tabs" aria-label="Main sections">
@@ -91,14 +91,14 @@ function render(): void {
 
       <section class="panel ${activeSection === 'dashboard' ? '' : 'hidden'}" id="dashboard-panel">
         <h2>Dashboard</h2>
-        <p class="helper">Feature placeholders are ready. Tool calls and backend logic are not yet connected.</p>
+        <p class="helper">These planning tools are being actively integrated with Canvas context and citation-backed reasoning.</p>
         <div class="feature-grid">
           ${FEATURES.map(
             (feature) => `
               <article class="feature-card">
                 <h3>${feature.title}</h3>
                 <p>${feature.description}</p>
-                <button type="button" disabled>Coming Soon</button>
+                <button type="button" disabled>In Progress</button>
               </article>
             `,
           ).join('')}
@@ -107,7 +107,7 @@ function render(): void {
 
       <section class="panel ${activeSection === 'chat' ? '' : 'hidden'}" id="chat-panel">
         <h2>Chat</h2>
-        <p class="helper">This chat uses a basic backend with per-session memory. Canvas/MCP/RAG features are still placeholders.</p>
+        <p class="helper">Use chat for Canvas-informed support, including study planning and course-grounded explanations with citations when available.</p>
         <div class="chat-actions">
           <button type="button" id="reset-chat" class="secondary-btn" ${isSending ? 'disabled' : ''}>Reset Chat</button>
         </div>

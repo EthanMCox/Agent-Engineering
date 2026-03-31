@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from backend.canvas_context import build_canvas_prompt_context
+from backend.canvas_context import extract_course_ids
 
 
 class FakeContentItem:
@@ -56,3 +57,16 @@ def test_build_canvas_prompt_context_handles_empty_results() -> None:
 
     assert "Courses: none returned or unavailable." in result.prompt_context
     assert result.sources == []
+
+
+def test_extract_course_ids_prefers_structured_then_fallback() -> None:
+    class StructuredResult:
+        structured_content = {"courses": [{"id": 7}, {"id": "9"}]}
+        content: list[object] = []
+
+    ids = extract_course_ids(StructuredResult(), limit=2)
+    assert ids == [7, 9]
+
+    markdown_result = FakeToolResult(["| id | name |", "| 11 | Biology |"])
+    fallback_ids = extract_course_ids(markdown_result, limit=1)
+    assert fallback_ids == [11]

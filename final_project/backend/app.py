@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import time
 from contextlib import asynccontextmanager
 from typing import Any
+from typing import Literal as TypingLiteral
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -15,12 +15,17 @@ from pydantic import BaseModel, Field
 
 from .canvas_context import CanvasSource
 from .canvas_context import build_canvas_prompt_context
+from .canvas_context import extract_course_ids
 from .mcp_client import CanvasMCPClient
+from .settings import AppSettings
+from .settings import load_settings
 
 SYSTEM_PROMPT = (
     "You are a helpful study assistant for a student web app. "
     "Be concise, honest, and practical. "
     "If you are unsure, clearly say so instead of making up facts. "
+    "When Canvas grounding context is provided, treat it as the primary source of truth and cite it clearly in your response. "
+    "When Canvas grounding context is unavailable, explicitly say what is uncertain. "
     "Format answers cleanly: use short paragraphs, bullet lists when helpful, and fenced code blocks only when needed. "
     "Output markdown only. Do not output raw renderable HTML, CSS, JavaScript, or inline style attributes. "
     "If a user asks for HTML/CSS/JS examples, provide them inside fenced code blocks (for example, ```html ... ```), not as renderable markup. "
@@ -29,10 +34,11 @@ SYSTEM_PROMPT = (
 )
 DEFAULT_MODEL = "gpt-5-nano"
 MAX_TURNS = 12
+settings: AppSettings = load_settings()
 
 
 def configure_logging() -> logging.Logger:
-    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level_name = settings.log_level.upper()
     level = getattr(logging, level_name, logging.INFO)
     logging.basicConfig(
         level=level,
@@ -71,14 +77,16 @@ class HealthResponse(BaseModel):
     model: str
     mcp_canvas_ok: bool
     mcp_canvas_enabled: bool
+    mcp_canvas_status: TypingLiteral["disabled", "starting", "ready", "degraded", "error"]
     mcp_canvas_error: str | None = None
 
 
-canvas_mcp_client = CanvasMCPClient()
+canvas_mcp_client = CanvasMCPClient(settings=settings)
 
 
 @asynccontextmanager
 async def app_lifespan(_: FastAPI):
+    logger.info("Canvas MCP startup config: %s", canvas_mcp_client.startup_summary())
     if canvas_mcp_client.enabled:
         try:
             await canvas_mcp_client.start()
@@ -90,24 +98,20 @@ async def app_lifespan(_: FastAPI):
 
 app = FastAPI(title="Canvas Study Coach Chat API", version="0.1.0", lifespan=app_lifespan)
 
-allowed_origins = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in allowed_origins.split(",") if origin.strip()],
+    allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-client = AsyncOpenAI()
+client = AsyncOpenAI(api_key=settings.openai_api_key)
 conversation_store: dict[str, list[dict[str, str]]] = {}
 
 
 def active_model() -> str:
-    return os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
+    return settings.openai_model or DEFAULT_MODEL
 
 
 def mask_session_id(session_id: str) -> str:
@@ -179,28 +183,6 @@ def _source_to_dict(source: CanvasSource) -> dict[str, str]:
     }
 
 
-def _extract_candidate_course_ids(tool_result: Any, limit: int = 3) -> list[int]:
-    content = getattr(tool_result, "content", None)
-    if not content or not isinstance(content, list):
-        return []
-
-    ids: list[int] = []
-    seen: set[int] = set()
-    for item in content:
-        text = getattr(item, "text", "")
-        if not isinstance(text, str):
-            continue
-        for match in re.finditer(r"\|\s*(\d{2,})\s*\|", text):
-            value = int(match.group(1))
-            if value in seen:
-                continue
-            seen.add(value)
-            ids.append(value)
-            if len(ids) >= limit:
-                return ids
-    return ids
-
-
 async def build_optional_canvas_context() -> tuple[str | None, list[dict[str, str]]]:
     if not canvas_mcp_client.enabled:
         return None, []
@@ -208,10 +190,15 @@ async def build_optional_canvas_context() -> tuple[str | None, list[dict[str, st
     try:
         courses_result = await canvas_mcp_client.list_courses()
         assignment_results: dict[str, Any] = {}
-        for course_id in _extract_candidate_course_ids(courses_result, limit=3):
+        course_ids = extract_course_ids(courses_result, limit=settings.canvas_mcp_course_limit)
+        for course_id in course_ids:
             try:
-                assignment_results[str(course_id)] = await canvas_mcp_client.list_assignments(course_id=course_id, limit=8)
-            except Exception:
+                assignment_results[str(course_id)] = await canvas_mcp_client.list_assignments(
+                    course_id=course_id,
+                    limit=settings.canvas_mcp_assignments_limit,
+                )
+            except Exception as exc:
+                logger.warning("Assignments fetch failed for course_id=%s error=%s", course_id, exc)
                 continue
 
         context = build_canvas_prompt_context(
@@ -233,6 +220,7 @@ async def health() -> HealthResponse:
         model=active_model(),
         mcp_canvas_ok=mcp_health.connected,
         mcp_canvas_enabled=mcp_health.enabled,
+        mcp_canvas_status=mcp_health.status,
         mcp_canvas_error=mcp_health.last_error,
     )
 
@@ -242,7 +230,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     masked_session_id = mask_session_id(payload.session_id)
     logger.info("Chat request received session=%s message_chars=%d", masked_session_id, len(payload.message))
 
-    if not os.getenv("OPENAI_API_KEY"):
+    if not settings.openai_api_key:
         logger.error("OPENAI_API_KEY is not configured")
         raise HTTPException(
             status_code=500,
@@ -283,6 +271,18 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                         "Use this Canvas grounding context when answering. "
                         "If context conflicts with prior assumptions, prefer the Canvas context.\n\n"
                         f"{canvas_context}"
+                    ),
+                },
+                *history[1:],
+            ]
+        else:
+            request_history = [
+                history[0],
+                {
+                    "role": "system",
+                    "content": (
+                        "Canvas grounding context is unavailable for this request. "
+                        "Do not fabricate Canvas facts; clearly state uncertainty where relevant."
                     ),
                 },
                 *history[1:],

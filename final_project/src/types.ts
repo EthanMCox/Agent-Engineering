@@ -1,4 +1,4 @@
-export type FeatureStatus = 'coming-soon'
+export type FeatureStatus = 'in-progress'
 
 export interface DashboardFeature {
   id: string

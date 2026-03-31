@@ -9,7 +9,7 @@ from backend.mcp_client import MCPHealth
 
 def test_health_reports_mcp_status(monkeypatch) -> None:
     async def fake_health() -> MCPHealth:
-        return MCPHealth(enabled=True, connected=True, last_error=None)
+        return MCPHealth(enabled=True, connected=True, status="ready", last_error=None)
 
     monkeypatch.setattr(canvas_mcp_client, "health", fake_health)
 
@@ -21,3 +21,4 @@ def test_health_reports_mcp_status(monkeypatch) -> None:
     assert payload["ok"] is True
     assert payload["mcp_canvas_enabled"] is True
     assert payload["mcp_canvas_ok"] is True
+    assert payload["mcp_canvas_status"] == "ready"

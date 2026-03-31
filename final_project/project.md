@@ -72,12 +72,12 @@ Build a Canvas Study Coach application that connects to Canvas LMS to summarize 
 
 ---
 
-## Frontend Starter Status
+## Frontend Implementation Status
 
-The initial frontend scaffold is now set up in `final_project/` using vanilla HTML, CSS, and TypeScript with Vite.
+The frontend is implemented in `final_project/` using vanilla HTML, CSS, and TypeScript with Vite.
 
 ### What Is Implemented
-- Single-page app shell with header and "Template Mode" status badge
+- Single-page app shell with final-project status messaging
 - Navigation tabs for `Dashboard` and `Chat` (hash-based section switching)
 - Dashboard feature cards:
   - Grade Summary
@@ -92,11 +92,11 @@ The initial frontend scaffold is now set up in `final_project/` using vanilla HT
   - `DashboardFeature`
   - `ChatMessage`
 
-### What Is Not Implemented Yet
-- Canvas API or MCP integration
-- RAG/context retrieval pipeline
-- Multi-agent orchestration
-- Advanced guardrails and production chat reliability features
+### What Is In Progress
+- Dashboard cards currently present roadmap areas and are not yet interactive
+- RAG/context retrieval beyond current Canvas grounding is still being expanded
+- Multi-agent orchestration is planned but not yet wired into runtime chat flows
+- Additional hardening and guardrail depth are still in progress
 
 ### Local Run Commands
 - Frontend: `npm run dev`
@@ -124,12 +124,34 @@ The initial frontend scaffold is now set up in `final_project/` using vanilla HT
   - `CANVAS_MCP_ENABLED=true`
   - `CANVAS_API_TOKEN=<canvas token>`
   - `CANVAS_DOMAIN=<school>.instructure.com`
+- Precedence rule:
+  - Backend loads `.env` first; OS environment is used as fallback for missing keys.
 - Optional overrides:
   - `CANVAS_MCP_COMMAND` (defaults to `npx canvas-mcp-server`)
   - `CANVAS_MCP_WORKDIR` (defaults to `.\mcp-canvas`)
   - `CANVAS_MCP_STARTUP_TIMEOUT_SECONDS` (defaults to `15`)
+  - `CANVAS_MCP_CALL_TIMEOUT_SECONDS` (defaults to `10`)
+  - `CANVAS_MCP_COURSE_LIMIT` (defaults to `3`)
+  - `CANVAS_MCP_ASSIGNMENTS_LIMIT` (defaults to `8`)
 
 ### Startup Model
 - Preferred: backend manages MCP sidecar lifecycle automatically on startup.
 - Diagnostics only: run sidecar manually with
   - `npm --prefix .\mcp-canvas run start`
+
+### Health Verification
+- `GET /health` returns:
+  - `mcp_canvas_enabled` (feature toggle),
+  - `mcp_canvas_ok` (active session),
+  - `mcp_canvas_status` (`disabled`, `starting`, `ready`, `degraded`, `error`),
+  - `mcp_canvas_error` (latest actionable failure message).
+
+### Troubleshooting
+- `mcp_canvas_status=error` with `Python package 'mcp' not installed`:
+  - Use the Python interpreter where `mcp` is installed, then reinstall backend deps.
+- `mcp_canvas_status=error` with missing token/domain:
+  - Set `CANVAS_API_TOKEN` and `CANVAS_DOMAIN`.
+- `mcp_canvas_status=error` with command/workdir failures:
+  - Verify `CANVAS_MCP_COMMAND` and `CANVAS_MCP_WORKDIR`.
+- `mcp_canvas_status=degraded`:
+  - MCP started but tool probing/calls failed; verify Canvas credentials/connectivity.
