@@ -1,0 +1,439 @@
+{
+  "schema_version": "1.0.0",
+  "updated_for": "lecture1a-through-lecture3g",
+  "patterns": [
+    {
+      "pattern_id": "completion_prompt_baseline",
+      "name": "Completion + Prompt Engineering Baseline",
+      "intent": "Use lightweight prompting for single-shot generation, classification, and formatting tasks.",
+      "when_to_use": [
+        "Rapid prompt iteration",
+        "Simple transformations with no tools",
+        "Low-overhead baseline before adding orchestration"
+      ],
+      "anti_patterns": [
+        "Using single-shot prompts for multi-turn agent workflows",
+        "Relying on prompt-only controls for high-risk tasks"
+      ],
+      "implementation_outline": [
+        "Construct concise instruction prompt",
+        "Call model once with deterministic settings",
+        "Compare prompt variants and capture outcomes"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture1a-intro-to-completion",
+          "why_relevant": "Core completion workflows and prompt experiments.",
+          "key_files": [
+            "lecture1a-intro-to-completion/completion_app.py",
+            "lecture1a-intro-to-completion/basic_response.py",
+            "lecture1a-intro-to-completion/text_processor.py"
+          ]
+        },
+        {
+          "lecture_id": "lecture1b-prompt-engineering",
+          "why_relevant": "Prompt refinements for classifiers and structured outputs.",
+          "key_files": [
+            "lecture1b-prompt-engineering/completion_app.py",
+            "lecture1b-prompt-engineering/malicious_classifier.py",
+            "lecture1b-prompt-engineering/language_analysis.py"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "stateful_chat_agent",
+      "name": "Stateful Chat Agent",
+      "intent": "Maintain turn history and system instructions for conversational behavior.",
+      "when_to_use": [
+        "Chat interfaces with multi-turn continuity",
+        "Persona/task-specific assistant flows"
+      ],
+      "anti_patterns": [
+        "Unbounded history growth without compaction",
+        "No role separation between system and user signals"
+      ],
+      "implementation_outline": [
+        "Initialize optional system prompt in history",
+        "Append user turn, call model, append outputs",
+        "Repeat until chat session ends"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture1c-chat",
+          "why_relevant": "Foundational chat loop with console and web options.",
+          "key_files": [
+            "lecture1c-chat/chatbot.py",
+            "lecture1c-chat/our_chat.py",
+            "lecture1c-chat/template_persona.md"
+          ]
+        },
+        {
+          "lecture_id": "lecture1d-jailbreaking",
+          "why_relevant": "Stateful chat under adversarial prompting.",
+          "key_files": [
+            "lecture1d-jailbreaking/jailbot.py",
+            "lecture1d-jailbreaking/agent_chats.py"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "jailbreak_guardrails",
+      "name": "Jailbreak Testing + Prompt Guardrails",
+      "intent": "Stress-test and harden agent behavior against adversarial inputs.",
+      "when_to_use": [
+        "Safety-sensitive assistants",
+        "Prompt policy hardening and red-team exercises"
+      ],
+      "anti_patterns": [
+        "Evaluating only happy-path prompts",
+        "Prompt hardening without measurable regression checks"
+      ],
+      "implementation_outline": [
+        "Author constrained system prompts and boundaries",
+        "Run adversarial prompts/chats",
+        "Iterate instructions and verify failures are reduced"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture1d-jailbreaking",
+          "why_relevant": "Primary jailbreak examples and attack transcripts.",
+          "key_files": [
+            "lecture1d-jailbreaking/jailbot.py",
+            "lecture1d-jailbreaking/jail_prompt.md",
+            "lecture1d-jailbreaking/hack-other-chats.md"
+          ]
+        },
+        {
+          "lecture_id": "lecture3g-evaluation-and-security",
+          "why_relevant": "Security-oriented structured evaluation patterns.",
+          "key_files": [
+            "lecture3g-evaluation-and-security/run_agent.py",
+            "lecture3g-evaluation-and-security/agents.py",
+            "lecture3g-evaluation-and-security/resume_job_description_helpers.py"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "reasoning_workflow_prompts",
+      "name": "Reasoning Workflow Prompts",
+      "intent": "Use explicit reasoning scaffolds for multi-step thought and structured analysis.",
+      "when_to_use": [
+        "Complex analytical prompts requiring decomposition",
+        "Reasoning templates with repeatable format"
+      ],
+      "anti_patterns": [
+        "Assuming long reasoning text implies correctness",
+        "No verification after generated rationale"
+      ],
+      "implementation_outline": [
+        "Define stepwise reasoning instructions",
+        "Apply to target scenario with consistent template",
+        "Review output quality against expected constraints"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture1e-reasoning",
+          "why_relevant": "Reasoning prompt examples and comparative experiments.",
+          "key_files": [
+            "lecture1e-reasoning/chatbot.py",
+            "lecture1e-reasoning/simple-reasoning.md",
+            "lecture1e-reasoning/three-hats.md"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "rag_pipeline",
+      "name": "RAG Ingestion + Retrieval + Grounded Answering",
+      "intent": "Ground responses in retrieved corpus context with chunking and metadata.",
+      "when_to_use": [
+        "Knowledge-intensive Q&A over private/source corpora",
+        "Need for traceable source-grounded answers"
+      ],
+      "anti_patterns": [
+        "Ignoring metadata/chunk strategy",
+        "Presenting retrieved content as user-provided text"
+      ],
+      "implementation_outline": [
+        "Ingest corpus into vector store with chunk metadata",
+        "Retrieve relevant chunks/documents per query",
+        "Inject context with grounded response instructions"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture2a-rag",
+          "why_relevant": "Embedding-first RAG experimentation notebooks.",
+          "key_files": [
+            "lecture2a-rag/Scripture-Embeddings.ipynb",
+            "lecture2a-rag/Phrase-Embeddings.ipynb",
+            "lecture2a-rag/Live Embedding Demo.ipynb"
+          ]
+        },
+        {
+          "lecture_id": "lecture2b-rag-solutions",
+          "why_relevant": "Operational RAG with Chroma ingestion and query routing.",
+          "key_files": [
+            "lecture2b-rag-solutions/chroma_demo.py",
+            "lecture2b-rag-solutions/doctrinal_chatbot.py",
+            "lecture2b-rag-solutions/system_prompt.md"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "function_tool_calling",
+      "name": "Function Tool Calling (Local Tools)",
+      "intent": "Allow model to invoke typed local functions in a response loop.",
+      "when_to_use": [
+        "Deterministic helper functions enrich chat behavior",
+        "Need controlled side-effect execution with typed args"
+      ],
+      "anti_patterns": [
+        "Tool calls without input validation",
+        "No loop termination or timeout policy"
+      ],
+      "implementation_outline": [
+        "Register tools with JSON schema",
+        "Send tool definitions in model call",
+        "Execute function_call outputs and append function_call_output"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture2d-tool-calling",
+          "why_relevant": "Core tool registry + schema generation loop.",
+          "key_files": [
+            "lecture2d-tool-calling/toolbot.py",
+            "lecture2d-tool-calling/tools.py",
+            "lecture2d-tool-calling/conference_tools.py"
+          ]
+        },
+        {
+          "lecture_id": "lecture2e-tool-calling-real-world-impact",
+          "why_relevant": "Expanded tool safety and sandbox examples.",
+          "key_files": [
+            "lecture2e-tool-calling-real-world-impact/toolbot.py",
+            "lecture2e-tool-calling-real-world-impact/sandbox_tools.py",
+            "lecture2e-tool-calling-real-world-impact/docker_code.py"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "mcp_integration",
+      "name": "MCP Server Integration",
+      "intent": "Integrate external capability servers through MCP.",
+      "when_to_use": [
+        "Capabilities hosted outside the main app process",
+        "Need standardized external tool protocol"
+      ],
+      "anti_patterns": [
+        "No readiness/health checks for MCP servers",
+        "Hardcoded endpoints with no config strategy"
+      ],
+      "implementation_outline": [
+        "Define MCP server metadata and transport URL",
+        "Attach MCP tool entries to model tool list",
+        "Handle failures with explicit fallback behavior"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture2f-mcp-and-alternatives",
+          "why_relevant": "Client-side MCP tool usage examples.",
+          "key_files": [
+            "lecture2f-mcp-and-alternatives/mcpbot.py",
+            "lecture2f-mcp-and-alternatives/tools.py",
+            "lecture2f-mcp-and-alternatives/report.md"
+          ]
+        },
+        {
+          "lecture_id": "lecture2f-mcp-and-alternatives",
+          "why_relevant": "Server-side FastMCP and deployment variants.",
+          "key_files": [
+            "lecture2f-mcp-and-alternatives/fastmcp_server/mcp_server_stock.py",
+            "lecture2f-mcp-and-alternatives/aws_mcp_server/app.py",
+            "lecture2f-mcp-and-alternatives/aws_mcp_server/README.md"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "multi_agent_orchestration",
+      "name": "Multi-Agent YAML Orchestration",
+      "intent": "Coordinate specialized sub-agents through declarative configs and tool handoffs.",
+      "when_to_use": [
+        "Role-specialized workflows",
+        "Sequential or delegated multi-step agent tasks"
+      ],
+      "anti_patterns": [
+        "Overlapping agent responsibilities",
+        "No logging/attribution for agent contributions"
+      ],
+      "implementation_outline": [
+        "Define agents in YAML with tools/prompts",
+        "Expose sub-agents as tools to a main agent",
+        "Run loop with usage tracking and explicit termination"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture3a-agents-and-multi-agent-workflows",
+          "why_relevant": "Core run_agent orchestration and two-step chains.",
+          "key_files": [
+            "lecture3a-agents-and-multi-agent-workflows/run_agent.py",
+            "lecture3a-agents-and-multi-agent-workflows/two_step.py",
+            "lecture3a-agents-and-multi-agent-workflows/deep_research.yaml"
+          ]
+        },
+        {
+          "lecture_id": "lecture3b-agents-as-tools",
+          "why_relevant": "Sub-agents wrapped as callable tools.",
+          "key_files": [
+            "lecture3b-agents-as-tools/agents.py",
+            "lecture3b-agents-as-tools/run_agent.py",
+            "lecture3b-agents-as-tools/quotes.yaml"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "agent_memory_systems",
+      "name": "Agent Memory (Episodic + MemGPT-Style)",
+      "intent": "Persist and retrieve durable memory across sessions while controlling context pressure.",
+      "when_to_use": [
+        "Longitudinal coaching/assistant interactions",
+        "Need durable user/profile memory and searchable history"
+      ],
+      "anti_patterns": [
+        "Unfiltered memory accumulation",
+        "No distinction between volatile context and archival memory"
+      ],
+      "implementation_outline": [
+        "Provide memory CRUD/search tools",
+        "Persist session/core/archival stores on disk",
+        "Inject memory summaries into active context with token budgeting"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture3f-cookbook-and-advanced-structure/episodic",
+          "why_relevant": "Session-linked episodic memory tools and persistence.",
+          "key_files": [
+            "lecture3f-cookbook-and-advanced-structure/episodic/agents.py",
+            "lecture3f-cookbook-and-advanced-structure/episodic/interview_memory.py",
+            "lecture3f-cookbook-and-advanced-structure/episodic/run_agent.py"
+          ]
+        },
+        {
+          "lecture_id": "lecture3f-cookbook-and-advanced-structure/memgpt",
+          "why_relevant": "Core/summary/fifo/archival memory management patterns.",
+          "key_files": [
+            "lecture3f-cookbook-and-advanced-structure/memgpt/agents.py",
+            "lecture3f-cookbook-and-advanced-structure/memgpt/memory.py",
+            "lecture3f-cookbook-and-advanced-structure/memgpt/chat_memory.yaml"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "langgraph_state_workflow",
+      "name": "LangGraph State Machine Orchestration",
+      "intent": "Use explicit graph transitions, loops, and checkpointed state for deterministic orchestration.",
+      "when_to_use": [
+        "Branching workflows with clear control flow",
+        "Resumable threaded state and human-in-the-loop loops"
+      ],
+      "anti_patterns": [
+        "Implicit control logic spread across prompts only",
+        "State mutations without typed contract"
+      ],
+      "implementation_outline": [
+        "Define typed state object",
+        "Build node graph with conditional edges",
+        "Persist checkpoints by thread/session ID"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture3f-cookbook-and-advanced-structure/langgraph-experimentation",
+          "why_relevant": "Minimal but complete state graph demo with review loop.",
+          "key_files": [
+            "lecture3f-cookbook-and-advanced-structure/langgraph-experimentation/graph.py",
+            "lecture3f-cookbook-and-advanced-structure/langgraph-experimentation/nodes.py",
+            "lecture3f-cookbook-and-advanced-structure/langgraph-experimentation/checkpointer.py"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "evaluation_security_harness",
+      "name": "Evaluation + Security Harnesses",
+      "intent": "Measure output quality and safety regressions with explicit checks and helper tools.",
+      "when_to_use": [
+        "Production-hardening before release",
+        "Automated quality gate and regression monitoring"
+      ],
+      "anti_patterns": [
+        "Only manual spot checks",
+        "No objective metrics for quality claims"
+      ],
+      "implementation_outline": [
+        "Define measurable rubric checks",
+        "Run evaluator helper logic on outputs",
+        "Track failures and iterate prompts/tools"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture3g-evaluation-and-security",
+          "why_relevant": "Objective scoring helpers and app-level evaluation integration.",
+          "key_files": [
+            "lecture3g-evaluation-and-security/resume_job_description_helpers.py",
+            "lecture3g-evaluation-and-security/resume_job_description_app.py",
+            "lecture3g-evaluation-and-security/resume_extract_helpers.py"
+          ]
+        },
+        {
+          "lecture_id": "lecture2g-ethics-and-human-factors-of-tool-calling",
+          "why_relevant": "Human-factor framing for safe deployment decisions.",
+          "key_files": [
+            "lecture2g-ethics-and-human-factors-of-tool-calling/report.md"
+          ]
+        }
+      ]
+    },
+    {
+      "pattern_id": "governance_human_factors",
+      "name": "Governance and Human Factors Checkpoints",
+      "intent": "Integrate representation, ethics, and human-impact controls into delivery lifecycle.",
+      "when_to_use": [
+        "High-impact workflows with human decision effects",
+        "Need explicit policy/ethics review in design"
+      ],
+      "anti_patterns": [
+        "Safety and ethics only documented after implementation",
+        "No accountable ownership for approvals"
+      ],
+      "implementation_outline": [
+        "Define policy constraints and review criteria",
+        "Add human checkpoints for critical outputs",
+        "Record rationale and unresolved risks"
+      ],
+      "lecture_refs": [
+        {
+          "lecture_id": "lecture2c-ethics-of-content-representation",
+          "why_relevant": "Content representation ethics analysis.",
+          "key_files": [
+            "lecture2c-ethics-of-content-representation/report.md"
+          ]
+        },
+        {
+          "lecture_id": "lecture2g-ethics-and-human-factors-of-tool-calling",
+          "why_relevant": "Human-factor and tool-calling ethics considerations.",
+          "key_files": [
+            "lecture2g-ethics-and-human-factors-of-tool-calling/report.md"
+          ]
+        }
+      ]
+    }
+  ]
+}
+
