@@ -81,7 +81,7 @@ def build_settings(raw: dict[str, Any]) -> AppSettings:
         canvas_mcp_command=str(raw.get("CANVAS_MCP_COMMAND", "npx canvas-mcp-server")),
         canvas_mcp_workdir=str(raw.get("CANVAS_MCP_WORKDIR", Path(__file__).resolve().parent.parent / "mcp-canvas")),
         canvas_mcp_startup_timeout_seconds=_to_float(raw.get("CANVAS_MCP_STARTUP_TIMEOUT_SECONDS"), default=15.0),
-        canvas_mcp_call_timeout_seconds=_to_float(raw.get("CANVAS_MCP_CALL_TIMEOUT_SECONDS"), default=10.0),
+        canvas_mcp_call_timeout_seconds=_to_float(raw.get("CANVAS_MCP_CALL_TIMEOUT_SECONDS"), default=20.0),
         canvas_mcp_course_limit=max(1, _to_int(raw.get("CANVAS_MCP_COURSE_LIMIT"), default=3)),
         canvas_mcp_assignments_limit=max(1, _to_int(raw.get("CANVAS_MCP_ASSIGNMENTS_LIMIT"), default=8)),
         canvas_domain=str(canvas_domain) if canvas_domain else None,

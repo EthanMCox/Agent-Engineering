@@ -8,6 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mcp import ClientSession as MCPClientSession
+    from mcp import StdioServerParameters as MCPStdioServerParameters
+else:
+    MCPClientSession = Any
+    MCPStdioServerParameters = Any
 
 try:
     from mcp import ClientSession, StdioServerParameters
@@ -43,10 +51,13 @@ class CanvasMCPClient:
         self._domain = settings.canvas_domain
         self._token = settings.canvas_api_token
         self._lock = asyncio.Lock()
+        self._call_lock = asyncio.Lock()
         self._stack: AsyncExitStack | None = None
-        self._session: ClientSession | None = None
+        self._session: MCPClientSession | None = None
         self._last_error: str | None = None
         self._status: MCPStatus = "disabled" if not self._enabled else "starting"
+        self._recovery_cooldown_seconds = 15.0
+        self._cooldown_until = 0.0
 
     @property
     def enabled(self) -> bool:
@@ -75,7 +86,42 @@ class CanvasMCPClient:
             "status": self._status,
         }
 
-    def _build_server_parameters(self) -> StdioServerParameters:
+    @staticmethod
+    def _format_exception(exc: Exception) -> str:
+        detail = str(exc).strip()
+        if detail:
+            return f"{type(exc).__name__}: {detail}"
+        return type(exc).__name__
+
+    def _is_transport_recoverable_error(self, exc: Exception) -> bool:
+        message = self._format_exception(exc).lower()
+        transport_markers = (
+            "timeout",
+            "cancel",
+            "taskgroup",
+            "transport",
+            "connection",
+            "broken pipe",
+            "eof",
+            "closed resource",
+            "stream",
+        )
+        if any(marker in message for marker in transport_markers):
+            return True
+
+        # Some runtimes provide little detail; treat asyncio timeout/cancel types as recoverable.
+        return isinstance(exc, (asyncio.TimeoutError, TimeoutError, asyncio.CancelledError))
+
+    def _set_recovery_cooldown(self) -> None:
+        loop = asyncio.get_running_loop()
+        self._cooldown_until = loop.time() + self._recovery_cooldown_seconds
+
+    def _seconds_until_recovery(self) -> float:
+        loop = asyncio.get_running_loop()
+        remaining = self._cooldown_until - loop.time()
+        return max(0.0, remaining)
+
+    def _build_server_parameters(self) -> MCPStdioServerParameters:
         parts = shlex.split(self._command, posix=False)
         if not parts:
             raise RuntimeError("CANVAS_MCP_COMMAND produced an empty command.")
@@ -130,9 +176,9 @@ class CanvasMCPClient:
             await stack.aclose()
             self._session = None
             self._stack = None
-            self._last_error = str(exc)
+            self._last_error = self._format_exception(exc)
             self._status = "error"
-            logger.exception("Failed to initialize Canvas MCP session: %s", exc)
+            logger.exception("Failed to initialize Canvas MCP session: %s", self._last_error)
             raise
 
     async def _probe_tools_locked(self) -> None:
@@ -143,17 +189,25 @@ class CanvasMCPClient:
                 await self._session.list_tools()
             self._status = "ready"
         except Exception as exc:
-            self._last_error = f"MCP startup probe failed: {exc}"
+            self._last_error = f"MCP startup probe failed: {self._format_exception(exc)}"
             self._status = "degraded"
-            logger.warning("Canvas MCP initialized but probe failed: %s", exc)
+            logger.warning("Canvas MCP initialized but probe failed: %s", self._last_error)
 
     async def stop(self) -> None:
-        async with self._lock:
-            await self._stop_locked()
+        async with self._call_lock:
+            async with self._lock:
+                await self._stop_locked()
 
     async def _stop_locked(self) -> None:
         if self._stack is not None:
-            await self._stack.aclose()
+            try:
+                await self._stack.aclose()
+            except Exception as exc:
+                # Some MCP transport failures can leave cancellation scopes in an
+                # inconsistent state. Force-reset local handles so the client can
+                # start a fresh session on the next attempt.
+                self._last_error = f"MCP stack close failed during reset: {self._format_exception(exc)}"
+                logger.warning("Canvas MCP stack close failed during reset: %s", self._last_error)
         self._stack = None
         self._session = None
         self._status = "disabled" if not self._enabled else "degraded"
@@ -166,9 +220,15 @@ class CanvasMCPClient:
             last_error=self._last_error,
         )
 
-    async def _ensure_session(self) -> ClientSession:
+    async def _ensure_session(self) -> MCPClientSession:
         if not self._enabled:
             raise RuntimeError("Canvas MCP is disabled.")
+
+        remaining = self._seconds_until_recovery()
+        if remaining > 0:
+            reason = self._last_error or "recent MCP transport failure"
+            raise RuntimeError(f"Canvas MCP temporarily unavailable for {remaining:.1f}s: {reason}")
+
         if self._session is None:
             await self.start()
         if self._session is None:
@@ -177,32 +237,98 @@ class CanvasMCPClient:
 
     async def list_tools(self) -> list[str]:
         session = await self._ensure_session()
-        async with asyncio.timeout(self._call_timeout):
-            response = await session.list_tools()
-        return [tool.name for tool in response.tools]
+        try:
+            async with self._call_lock:
+                async with asyncio.timeout(self._call_timeout):
+                    response = await session.list_tools()
+            self._status = "ready"
+            self._last_error = None
+            return [getattr(tool, "name", "") for tool in response.tools]
+        except Exception as exc:
+            formatted_error = self._format_exception(exc)
+            self._status = "degraded"
+            self._last_error = f"list_tools: {formatted_error}"
+            if self._is_transport_recoverable_error(exc):
+                self._set_recovery_cooldown()
+            raise
+
+    async def list_tool_definitions(self) -> list[dict[str, Any]]:
+        session = await self._ensure_session()
+        try:
+            async with self._call_lock:
+                async with asyncio.timeout(self._call_timeout):
+                    response = await session.list_tools()
+            self._status = "ready"
+            self._last_error = None
+        except Exception as exc:
+            formatted_error = self._format_exception(exc)
+            self._status = "degraded"
+            self._last_error = f"list_tool_definitions: {formatted_error}"
+            if self._is_transport_recoverable_error(exc):
+                self._set_recovery_cooldown()
+            raise
+
+        definitions: list[dict[str, Any]] = []
+        for tool in response.tools:
+            name = getattr(tool, "name", "")
+            if not name:
+                continue
+            description = str(getattr(tool, "description", "") or "")
+            input_schema = (
+                getattr(tool, "inputSchema", None)
+                or getattr(tool, "input_schema", None)
+                or {"type": "object", "properties": {}, "required": []}
+            )
+            if not isinstance(input_schema, dict):
+                input_schema = {"type": "object", "properties": {}, "required": []}
+            definitions.append(
+                {
+                    "name": name,
+                    "description": description,
+                    "input_schema": input_schema,
+                }
+            )
+        return definitions
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> Any:
         payload = arguments or {}
-
-        for attempt in range(2):
-            session = await self._ensure_session()
-            try:
+        session = await self._ensure_session()
+        try:
+            logger.info(
+                "Canvas MCP call attempt tool=%s attempt=%d timeout_seconds=%.1f payload_keys=%s",
+                tool_name,
+                1,
+                self._call_timeout,
+                sorted(payload.keys()),
+            )
+            async with self._call_lock:
                 async with asyncio.timeout(self._call_timeout):
                     result = await session.call_tool(tool_name, payload)
-                self._status = "ready"
-                return result
-            except Exception as exc:
-                self._last_error = f"{tool_name}: {exc}"
-                self._status = "degraded"
-                if attempt == 1:
-                    self._status = "error"
-                    raise
-                logger.warning("Canvas MCP call failed; restarting session and retrying tool=%s error=%s", tool_name, exc)
-                async with self._lock:
-                    await self._stop_locked()
-                    self._status = "starting"
-                    await self._start_locked()
-        raise RuntimeError(f"Unexpected tool retry failure for {tool_name}")
+            self._status = "ready"
+            self._last_error = None
+            return result
+        except Exception as exc:
+            formatted_error = self._format_exception(exc)
+            self._last_error = f"{tool_name}: {formatted_error}"
+            self._status = "degraded"
+
+            if self._is_transport_recoverable_error(exc):
+                self._set_recovery_cooldown()
+                logger.exception(
+                    "Canvas MCP call failed; entering cooldown tool=%s payload_keys=%s cooldown_seconds=%.1f error=%s",
+                    tool_name,
+                    sorted(payload.keys()),
+                    self._recovery_cooldown_seconds,
+                    formatted_error,
+                )
+            else:
+                logger.warning(
+                    "Canvas MCP call failed with non-recoverable error tool=%s payload_keys=%s error=%s",
+                    tool_name,
+                    sorted(payload.keys()),
+                    formatted_error,
+                )
+            raise
 
     async def list_courses(self) -> Any:
         return await self.call_tool("list_courses", {})

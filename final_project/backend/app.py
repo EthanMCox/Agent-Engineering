@@ -13,19 +13,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
-from .canvas_context import CanvasSource
-from .canvas_context import build_canvas_prompt_context
-from .canvas_context import extract_course_ids
 from .mcp_client import CanvasMCPClient
 from .settings import AppSettings
 from .settings import load_settings
+from .tool_registry import CanvasToolRegistry
+from .tool_registry import parse_tool_arguments
 
 SYSTEM_PROMPT = (
-    "You are a helpful study assistant for a student web app. "
+    "You are a helpful study assistant."
     "Be concise, honest, and practical. "
     "If you are unsure, clearly say so instead of making up facts. "
-    "When Canvas grounding context is provided, treat it as the primary source of truth and cite it clearly in your response. "
-    "When Canvas grounding context is unavailable, explicitly say what is uncertain. "
+    "For Canvas-related questions (courses, assignments, deadlines, grades, study priorities), call Canvas tools first before answering. "
+    "Prefer Canvas tool-grounded facts over assumptions. "
+    "If Canvas tools are unavailable or incomplete, explicitly say what is uncertain and what data is missing. "
+    "When you use Canvas tool data, cite it briefly in bullet form. "
     "Format answers cleanly: use short paragraphs, bullet lists when helpful, and fenced code blocks only when needed. "
     "Output markdown only. Do not output raw renderable HTML, CSS, JavaScript, or inline style attributes. "
     "If a user asks for HTML/CSS/JS examples, provide them inside fenced code blocks (for example, ```html ... ```), not as renderable markup. "
@@ -34,6 +35,7 @@ SYSTEM_PROMPT = (
 )
 DEFAULT_MODEL = "gpt-5-nano"
 MAX_TURNS = 12
+MAX_TOOL_ROUNDS = 4
 settings: AppSettings = load_settings()
 
 
@@ -82,6 +84,7 @@ class HealthResponse(BaseModel):
 
 
 canvas_mcp_client = CanvasMCPClient(settings=settings)
+canvas_tool_registry = CanvasToolRegistry(canvas_mcp_client, settings=settings)
 
 
 @asynccontextmanager
@@ -174,41 +177,41 @@ def trim_history(history: list[dict[str, str]]) -> list[dict[str, str]]:
     return [system_message, *turns]
 
 
-def _source_to_dict(source: CanvasSource) -> dict[str, str]:
-    return {
-        "source_type": source.source_type,
-        "source_id": source.source_id,
-        "label": source.label,
-        "details": source.details,
-    }
+def merge_usage(totals: dict[str, int], usage_obj: Any | None) -> dict[str, int]:
+    if usage_obj is None:
+        return totals
+    dump = usage_obj.model_dump() if hasattr(usage_obj, "model_dump") else usage_obj
+    if not isinstance(dump, dict):
+        return totals
+    for key, value in dump.items():
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            totals[key] = totals.get(key, 0) + value
+    return totals
 
 
-async def build_optional_canvas_context() -> tuple[str | None, list[dict[str, str]]]:
-    if not canvas_mcp_client.enabled:
-        return None, []
+def extract_assistant_text(response: Any) -> str:
+    text_chunks: list[str] = []
+    output = getattr(response, "output", None)
+    if not isinstance(output, list):
+        return ""
 
-    try:
-        courses_result = await canvas_mcp_client.list_courses()
-        assignment_results: dict[str, Any] = {}
-        course_ids = extract_course_ids(courses_result, limit=settings.canvas_mcp_course_limit)
-        for course_id in course_ids:
-            try:
-                assignment_results[str(course_id)] = await canvas_mcp_client.list_assignments(
-                    course_id=course_id,
-                    limit=settings.canvas_mcp_assignments_limit,
-                )
-            except Exception as exc:
-                logger.warning("Assignments fetch failed for course_id=%s error=%s", course_id, exc)
-                continue
+    for item in output:
+        if getattr(item, "type", None) != "message":
+            continue
+        for chunk in getattr(item, "content", []):
+            chunk_text = getattr(chunk, "text", "")
+            if chunk_text:
+                text_chunks.append(chunk_text)
+    return "".join(text_chunks).strip()
 
-        context = build_canvas_prompt_context(
-            courses_result=courses_result,
-            assignments_by_course=assignment_results,
-        )
-        return context.prompt_context, [_source_to_dict(src) for src in context.sources]
-    except Exception as exc:
-        logger.warning("Canvas context unavailable for this request: %s", exc)
-        return None, []
+
+def format_exception(exc: Exception) -> str:
+    detail = str(exc).strip()
+    if detail:
+        return f"{type(exc).__name__}: {detail}"
+    return type(exc).__name__
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -260,38 +263,111 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             selected_model,
             len(history),
         )
-        canvas_context, sources = await build_optional_canvas_context()
-        request_history = history
-        if canvas_context:
-            request_history = [
-                history[0],
-                {
-                    "role": "system",
-                    "content": (
-                        "Use this Canvas grounding context when answering. "
-                        "If context conflicts with prior assumptions, prefer the Canvas context.\n\n"
-                        f"{canvas_context}"
-                    ),
-                },
-                *history[1:],
-            ]
-        else:
-            request_history = [
-                history[0],
-                {
-                    "role": "system",
-                    "content": (
-                        "Canvas grounding context is unavailable for this request. "
-                        "Do not fabricate Canvas facts; clearly state uncertainty where relevant."
-                    ),
-                },
-                *history[1:],
-            ]
 
-        response = await client.responses.create(
-            model=selected_model,
-            input=request_history,
-        )
+        tools, unavailable_reason = await canvas_tool_registry.get_openai_tools()
+        if tools:
+            tool_names = ", ".join(tool["name"] for tool in tools[:30])
+            runtime_note = (
+                "Canvas tools are available from the mcp-canvas sidecar. "
+                f"Available tools: {tool_names}. "
+                "For Canvas-related user requests, call the relevant Canvas tools first and ground your answer in tool output."
+            )
+        else:
+            runtime_note = (
+                "Canvas tools are unavailable for this request "
+                f"({unavailable_reason}). Do not fabricate Canvas facts; state uncertainty and continue with general guidance."
+            )
+        working_history: list[Any] = [
+            history[0],
+            {"role": "system", "content": runtime_note},
+            *history[1:],
+        ]
+
+        sources: list[dict[str, str]] = []
+        usage_totals: dict[str, int] = {}
+        assistant_text = ""
+        tools_enabled_for_turn = bool(tools)
+
+        for round_index in range(1, MAX_TOOL_ROUNDS + 2):
+            response = await client.responses.create(
+                model=selected_model,
+                input=working_history,
+                tools=tools if tools_enabled_for_turn else None,
+            )
+            usage_totals = merge_usage(usage_totals, response.usage)
+            working_history.extend(getattr(response, "output", []))
+
+            tool_calls = [
+                item for item in getattr(response, "output", []) if getattr(item, "type", None) == "function_call"
+            ]
+            if tool_calls:
+                logger.info(
+                    "Tool round session=%s round=%d tool_calls=%d",
+                    masked_session_id,
+                    round_index,
+                    len(tool_calls),
+                )
+
+            assistant_text = extract_assistant_text(response)
+            if assistant_text:
+                break
+
+            if not tool_calls:
+                break
+
+            if round_index > MAX_TOOL_ROUNDS:
+                assistant_text = (
+                    "I reached the Canvas tool-call limit for this turn. "
+                    "Please narrow your request or ask for one course at a time."
+                )
+                logger.warning("Tool loop limit reached session=%s", masked_session_id)
+                break
+
+            for tool_call in tool_calls:
+                tool_name = getattr(tool_call, "name", "")
+                call_id = getattr(tool_call, "call_id", "")
+                raw_arguments = getattr(tool_call, "arguments", "") or "{}"
+                try:
+                    arguments = parse_tool_arguments(raw_arguments)
+                    logger.info(
+                        "Dispatching tool session=%s tool=%s call_id=%s argument_keys=%s",
+                        masked_session_id,
+                        tool_name,
+                        call_id,
+                        sorted(arguments.keys()),
+                    )
+                    dispatch_result = await canvas_tool_registry.dispatch_tool_call(tool_name, arguments)
+                    output_text = dispatch_result.output_text
+                    logger.info(
+                        "Tool execution succeeded session=%s tool=%s output_chars=%d",
+                        masked_session_id,
+                        tool_name,
+                        len(output_text),
+                    )
+                    if dispatch_result.sources:
+                        sources.extend(dispatch_result.sources)
+                except Exception as exc:
+                    logger.exception(
+                        "Tool execution failed session=%s tool=%s call_id=%s error=%s",
+                        masked_session_id,
+                        tool_name,
+                        call_id,
+                        format_exception(exc),
+                    )
+                    tools_enabled_for_turn = False
+                    output_text = (
+                        f"Tool '{tool_name}' failed with error: {format_exception(exc)}. "
+                        "Proceed without this data and clearly state uncertainty."
+                    )
+
+                working_history.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": output_text,
+                    }
+                )
+
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info("Model call completed session=%s latency_ms=%d", masked_session_id, elapsed_ms)
     except Exception as exc:
@@ -302,7 +378,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             detail=f"Failed to get model response: {exc}",
         ) from exc
 
-    assistant_text = normalize_output_format(response.output_text or "")
+    assistant_text = normalize_output_format(assistant_text)
     if not assistant_text:
         assistant_text = "I could not generate a response. Please try again."
         logger.warning("Model returned empty output; fallback message used session=%s", masked_session_id)
@@ -311,7 +387,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     trimmed_history = trim_history(history)
     conversation_store[payload.session_id] = trimmed_history
 
-    usage = response.usage.model_dump() if response.usage else None
+    usage = usage_totals or None
     if usage:
         logger.info(
             "Usage session=%s input_tokens=%s output_tokens=%s total_tokens=%s",

@@ -139,6 +139,11 @@ The frontend is implemented in `final_project/` using vanilla HTML, CSS, and Typ
 - Diagnostics only: run sidecar manually with
   - `npm --prefix .\mcp-canvas run start`
 
+### Chat Tool-Calling Behavior
+- Backend chat now uses a local tool-calling loop for Canvas grounding.
+- When MCP is healthy, the backend dynamically registers all tools exposed by the `mcp-canvas` sidecar (`canvas-mcp-server`) and makes them callable during each chat turn.
+- When MCP is unavailable, tools are not registered and the assistant explicitly falls back with uncertainty language.
+
 ### Health Verification
 - `GET /health` returns:
   - `mcp_canvas_enabled` (feature toggle),
