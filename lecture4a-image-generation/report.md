@@ -1,0 +1,5 @@
+I experimented with generating images, modifying generated images, and extracting information from images. I was pretty impressed with the model's capacity to do all of these. When I modified one image I had it generated, it followed my instructions well and retained the core aspects of the original image while adding the features that I wanted. I was also very impressed with the descriptions it gave of the images that I gave it. It consistently gave pretty good detail. When aspects of the image were ambiguous, it did a good job of stating a couple different things that it could have been. 
+
+With image generation in particular, one key takeaway for me is the importance of iteration. I think that AI frequently doesn't get it right on the first try, but having it iterate on initial results can improve the output a lot, but like actual human work. 
+
+I spent the remaining amount of time working on the project. 
