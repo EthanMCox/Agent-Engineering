@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
+from .context_budget import ContextBudgetPlan
+from .context_budget import estimate_tokens_from_messages
 from .mcp_client import CanvasMCPClient
 from .settings import AppSettings
 from .settings import load_settings
@@ -25,8 +27,11 @@ SYSTEM_PROMPT = (
     "Be concise, honest, and practical. "
     "If you are unsure, clearly say so instead of making up facts. "
     "For Canvas-related questions (courses, assignments, deadlines, grades, study priorities), call Canvas tools first before answering. "
+    "Prefer narrow, incremental tool calls. For broad datasets, use pagination helpers and fetch only needed pages. "
     "Prefer Canvas tool-grounded facts over assumptions. "
     "If Canvas tools are unavailable or incomplete, explicitly say what is uncertain and what data is missing. "
+    "When tool provenance is present, only claim a field is unavailable if it appears in fields_missing_from_source. "
+    "If a field appears in fields_omitted_by_budget, explain it was omitted due to context budget and request a narrower follow-up. "
     "When you use Canvas tool data, cite it briefly in bullet form. "
     "Format answers cleanly: use short paragraphs, bullet lists when helpful, and fenced code blocks only when needed. "
     "Output markdown only. Do not output raw renderable HTML, CSS, JavaScript, or inline style attributes. "
@@ -36,11 +41,20 @@ SYSTEM_PROMPT = (
 )
 DEFAULT_MODEL = "gpt-5-nano"
 MAX_TURNS = 12
-MAX_TOOL_ROUNDS = 4
+TOOL_PROGRESS_CHECK_INTERVAL = 10
 RAW_TURN_WINDOW = 6
 MAX_MEMORY_SECTION_ITEMS = 8
 MAX_MEMORY_ITEM_CHARS = 220
 MAX_MEMORY_SUMMARY_CHARS = 1200
+TRANSIENT_TOOL_FAILURE_MARKERS = (
+    "canvas tools are unavailable",
+    "tool outage",
+    "temporarily unavailable",
+    "timeout",
+    "tool failed",
+    "failed with error",
+    "mcp",
+)
 settings: AppSettings = load_settings()
 
 
@@ -77,6 +91,11 @@ class ResetRequest(BaseModel):
 
 class ResetResponse(BaseModel):
     ok: bool
+
+
+class DebugCallRequest(BaseModel):
+    tool_name: str = Field(min_length=1)
+    arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):
@@ -303,7 +322,15 @@ def _recent_raw_messages(history: list[dict[str, str]], turn_window: int = RAW_T
     messages = history[1:]
     if not messages:
         return []
-    return messages[-(turn_window * 2):]
+    filtered: list[dict[str, str]] = []
+    for message in messages:
+        role = str(message.get("role", ""))
+        content = str(message.get("content", "")).lower()
+        if role == "assistant" and any(marker in content for marker in TRANSIENT_TOOL_FAILURE_MARKERS):
+            # Do not persist transient tool outage/failure language across turns.
+            continue
+        filtered.append(message)
+    return filtered[-(turn_window * 2):]
 
 
 async def _summarize_text_with_small_model(
@@ -327,12 +354,60 @@ async def _summarize_text_with_small_model(
                 "content": f"{instruction}\n\nCONTENT:\n{content}",
             },
         ],
-        max_output_tokens=max_output_tokens,
+        max_output_tokens=min(max_output_tokens, settings.openai_summarizer_max_output_tokens),
     )
     text = extract_assistant_text(response).strip()
     if not text:
         raise RuntimeError("Summarizer returned empty output.")
     return text
+
+
+async def _evaluate_tool_progress_checkpoint(
+    *,
+    user_question: str,
+    trace_items: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Evaluate whether recent tool calls are making progress toward the user request.
+    Returns:
+      {"making_progress": bool, "action": "continue|pivot|stop", "guidance": str}
+    """
+    instruction = (
+        "You are a supervisor for tool-use progress. "
+        "Given the user goal and recent tool-call trace, decide if progress is being made. "
+        "Return JSON only with keys: making_progress (boolean), action (continue|pivot|stop), guidance (string). "
+        "Use action=continue when clear new relevant facts are being gathered. "
+        "Use action=pivot when tools are repetitive/low-value and the agent should change strategy. "
+        "Use action=stop when enough information exists to answer or further calls are unlikely to help."
+    )
+    content = (
+        f"USER_QUESTION:\n{user_question}\n\n"
+        f"RECENT_TOOL_TRACE_JSON:\n{json.dumps(trace_items, ensure_ascii=True)}"
+    )
+    try:
+        raw = await _summarize_text_with_small_model(
+            instruction,
+            content,
+            max_output_tokens=min(350, settings.openai_summarizer_max_output_tokens),
+        )
+        parsed = json.loads(raw)
+        making_progress = bool(parsed.get("making_progress", True))
+        action = str(parsed.get("action", "continue")).strip().lower()
+        if action not in {"continue", "pivot", "stop"}:
+            action = "continue"
+        guidance = str(parsed.get("guidance", "")).strip()
+        return {
+            "making_progress": making_progress,
+            "action": action,
+            "guidance": guidance,
+        }
+    except Exception as exc:
+        logger.warning("Tool progress checkpoint fallback used error=%s", format_exception(exc))
+        return {
+            "making_progress": True,
+            "action": "continue",
+            "guidance": "Progress checkpoint unavailable; continue normally.",
+        }
 
 
 def _render_memory_for_prompt(memory: dict[str, Any]) -> str:
@@ -362,7 +437,8 @@ async def _update_session_memory(
         "{\"conversation_summary\": string, \"active_goals\": string[], \"confirmed_facts\": string[], "
         "\"open_questions\": string[], \"recent_tool_findings\": string[]}. "
         "Rules: keep each list to max 8 short items, keep only high-signal facts, remove stale items, "
-        "and avoid speculation. Return JSON only."
+        "and avoid speculation. Do not store transient infrastructure/tool failures (timeouts, outages, temporary "
+        "MCP unavailability) as durable facts. Return JSON only."
     )
     content = (
         f"CURRENT_MEMORY_JSON:\n{json.dumps(current_memory, ensure_ascii=True)}\n\n"
@@ -435,12 +511,21 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         )
 
         tools, unavailable_reason = await canvas_tool_registry.get_openai_tools()
+        budget_plan = ContextBudgetPlan(
+            max_input_tokens=settings.context_max_input_tokens,
+            reserved_output_tokens=settings.context_reserved_output_tokens,
+            reserved_system_tokens=settings.context_reserved_system_tokens,
+            max_tool_tokens_per_append=settings.tool_result_max_tokens_per_append,
+        )
         if tools:
             tool_names = ", ".join(tool["name"] for tool in tools[:30])
             runtime_note = (
                 "Canvas tools are available from the mcp-canvas sidecar. "
                 f"Available tools: {tool_names}. "
-                "For Canvas-related user requests, call the relevant Canvas tools first and ground your answer in tool output."
+                "For Canvas-related user requests, call the relevant Canvas tools first and ground your answer in tool output. "
+                "Use canvas_query_tool for broad data requests and navigate using canvas_get_result_page. "
+                "When user asks for full details (description/rubric/requirements), use wrapper args such as "
+                "mediation_mode='full_if_fits' or 'full' and include_description/include_rubric/fields."
             )
         else:
             runtime_note = (
@@ -461,9 +546,13 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         assistant_text = ""
         tools_enabled_for_turn = bool(tools)
         tool_outputs_for_memory: list[str] = []
+        total_tool_calls_this_turn = 0
+        tool_progress_trace: list[dict[str, Any]] = []
         reasoning_config = build_reasoning_request_config()
 
-        for round_index in range(1, MAX_TOOL_ROUNDS + 2):
+        round_index = 0
+        while True:
+            round_index += 1
             request: dict[str, Any] = {
                 "model": selected_model,
                 "input": working_history,
@@ -505,14 +594,6 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             if not tool_calls:
                 break
 
-            if round_index > MAX_TOOL_ROUNDS:
-                assistant_text = (
-                    "I reached the Canvas tool-call limit for this turn. "
-                    "Please narrow your request or ask for one course at a time."
-                )
-                logger.warning("Tool loop limit reached session=%s", masked_session_id)
-                break
-
             for tool_call in tool_calls:
                 tool_name = getattr(tool_call, "name", "")
                 call_id = getattr(tool_call, "call_id", "")
@@ -526,13 +607,32 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                         call_id,
                         sorted(arguments.keys()),
                     )
-                    dispatch_result = await canvas_tool_registry.dispatch_tool_call(tool_name, arguments)
+                    prompt_tokens_before_tool_append = estimate_tokens_from_messages(working_history)
+                    dispatch_result = await canvas_tool_registry.dispatch_tool_call(
+                        tool_name,
+                        arguments,
+                        session_id=payload.session_id,
+                        user_question=user_message,
+                        budget_plan=budget_plan,
+                        current_prompt_tokens=prompt_tokens_before_tool_append,
+                        summarize_func=_summarize_text_with_small_model,
+                    )
                     output_text = dispatch_result.output_text
+                    total_tool_calls_this_turn += 1
+                    tool_progress_trace.append(
+                        {
+                            "tool_name": tool_name,
+                            "argument_keys": sorted(arguments.keys()),
+                            "output_preview": preview_text(output_text, limit=280),
+                            "output_chars": len(output_text),
+                        }
+                    )
                     logger.info(
-                        "Tool execution succeeded session=%s tool=%s raw_output_chars=%d",
+                        "Tool execution succeeded session=%s tool=%s mediated_output_chars=%d prompt_tokens_before=%d",
                         masked_session_id,
                         tool_name,
                         len(output_text),
+                        prompt_tokens_before_tool_append,
                     )
                     tool_outputs_for_memory.append(output_text)
                     if dispatch_result.sources:
@@ -558,6 +658,43 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                         "output": output_text,
                     }
                 )
+                if total_tool_calls_this_turn > 0 and total_tool_calls_this_turn % TOOL_PROGRESS_CHECK_INTERVAL == 0:
+                    recent_trace = tool_progress_trace[-TOOL_PROGRESS_CHECK_INTERVAL:]
+                    checkpoint = await _evaluate_tool_progress_checkpoint(
+                        user_question=user_message,
+                        trace_items=recent_trace,
+                    )
+                    logger.info(
+                        "Tool progress checkpoint session=%s total_tool_calls=%d action=%s making_progress=%s guidance=%r",
+                        masked_session_id,
+                        total_tool_calls_this_turn,
+                        checkpoint.get("action"),
+                        checkpoint.get("making_progress"),
+                        preview_text(str(checkpoint.get("guidance", "")), limit=240),
+                    )
+                    if checkpoint.get("action") in {"pivot", "stop"}:
+                        tools_enabled_for_turn = False
+                        guidance = str(checkpoint.get("guidance", "")).strip() or (
+                            "Tool use appears repetitive or low-yield. "
+                            "Use available findings to answer clearly, state uncertainty, and ask a narrowing follow-up if needed."
+                        )
+                        working_history.append(
+                            {
+                                "role": "system",
+                                "content": (
+                                    "Supervisor checkpoint: stop further tool calls for this turn and finalize a response. "
+                                    f"Guidance: {guidance}"
+                                ),
+                            }
+                        )
+                prompt_tokens_after_tool_append = estimate_tokens_from_messages(working_history)
+                if prompt_tokens_after_tool_append > budget_plan.max_prompt_tokens:
+                    logger.warning(
+                        "Context budget pressure session=%s prompt_tokens_after=%d max_prompt_tokens=%d",
+                        masked_session_id,
+                        prompt_tokens_after_tool_append,
+                        budget_plan.max_prompt_tokens,
+                    )
 
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info("Model call completed session=%s latency_ms=%d", masked_session_id, elapsed_ms)
@@ -631,3 +768,37 @@ async def reset_chat(payload: ResetRequest) -> ResetResponse:
     conversation_store.pop(payload.session_id, None)
     session_memory_store.pop(payload.session_id, None)
     return ResetResponse(ok=True)
+
+
+@app.get("/api/debug/mcp/tools")
+async def debug_list_mcp_tools() -> dict[str, Any]:
+    try:
+        tools = await canvas_mcp_client.list_tool_definitions()
+    except Exception as exc:
+        return {"ok": False, "error": format_exception(exc), "count": 0, "tools": []}
+    return {"ok": True, "count": len(tools), "tools": [tool["name"] for tool in tools]}
+
+
+@app.post("/api/debug/mcp/call")
+async def debug_call_mcp_tool(payload: DebugCallRequest) -> dict[str, Any]:
+    budget_plan = ContextBudgetPlan(
+        max_input_tokens=settings.context_max_input_tokens,
+        reserved_output_tokens=settings.context_reserved_output_tokens,
+        reserved_system_tokens=settings.context_reserved_system_tokens,
+        max_tool_tokens_per_append=settings.tool_result_max_tokens_per_append,
+    )
+    result = await canvas_tool_registry.dispatch_tool_call(
+        payload.tool_name,
+        payload.arguments,
+        session_id="debug",
+        user_question="debug call",
+        budget_plan=budget_plan,
+        current_prompt_tokens=0,
+        summarize_func=_summarize_text_with_small_model,
+    )
+    return {
+        "ok": True,
+        "tool_name": payload.tool_name,
+        "output_chars": len(result.output_text),
+        "sources": result.sources,
+    }

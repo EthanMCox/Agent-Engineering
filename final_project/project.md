@@ -133,6 +133,15 @@ The frontend is implemented in `final_project/` using vanilla HTML, CSS, and Typ
   - `CANVAS_MCP_CALL_TIMEOUT_SECONDS` (defaults to `10`)
   - `CANVAS_MCP_COURSE_LIMIT` (defaults to `3`)
   - `CANVAS_MCP_ASSIGNMENTS_LIMIT` (defaults to `8`)
+  - `CONTEXT_MAX_INPUT_TOKENS` (defaults to `220000`)
+  - `CONTEXT_RESERVED_OUTPUT_TOKENS` (defaults to `24000`)
+  - `CONTEXT_RESERVED_SYSTEM_TOKENS` (defaults to `6000`)
+  - `TOOL_RESULT_MAX_TOKENS_PER_APPEND` (defaults to `12000`)
+  - `PAGINATION_DEFAULT_PAGE_SIZE` (defaults to `30`)
+  - `PAGINATION_MAX_PAGE_SIZE` (defaults to `100`)
+  - `PAGINATION_CACHE_TTL_SECONDS` (defaults to `900`)
+  - `PAGINATION_MAX_RESULTS_PER_SESSION` (defaults to `16`)
+  - `OPENAI_SUMMARIZER_MAX_OUTPUT_TOKENS` (defaults to `800`)
 
 ### Startup Model
 - Preferred: backend manages MCP sidecar lifecycle automatically on startup.
@@ -142,6 +151,11 @@ The frontend is implemented in `final_project/` using vanilla HTML, CSS, and Typ
 ### Chat Tool-Calling Behavior
 - Backend chat now uses a local tool-calling loop for Canvas grounding.
 - When MCP is healthy, the backend dynamically registers all tools exposed by the `mcp-canvas` sidecar (`canvas-mcp-server`) and makes them callable during each chat turn.
+- High-volume tool payloads are handled with context budgeting plus pagination helpers:
+  - `canvas_query_tool`
+  - `canvas_get_result_page`
+  - `canvas_get_result_head`
+  - `canvas_release_result`
 - When MCP is unavailable, tools are not registered and the assistant explicitly falls back with uncertainty language.
 
 ### Health Verification

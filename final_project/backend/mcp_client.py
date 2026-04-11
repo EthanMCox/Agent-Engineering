@@ -190,7 +190,7 @@ class CanvasMCPClient:
             self._status = "ready"
         except Exception as exc:
             self._last_error = f"MCP startup probe failed: {self._format_exception(exc)}"
-            self._status = "degraded"
+            self._status = "error"
             logger.warning("Canvas MCP initialized but probe failed: %s", self._last_error)
 
     async def stop(self) -> None:
@@ -210,7 +210,7 @@ class CanvasMCPClient:
                 logger.warning("Canvas MCP stack close failed during reset: %s", self._last_error)
         self._stack = None
         self._session = None
-        self._status = "disabled" if not self._enabled else "degraded"
+        self._status = "disabled"
 
     async def health(self) -> MCPHealth:
         return MCPHealth(
@@ -229,6 +229,11 @@ class CanvasMCPClient:
             reason = self._last_error or "recent MCP transport failure"
             raise RuntimeError(f"Canvas MCP temporarily unavailable for {remaining:.1f}s: {reason}")
 
+        # Clear stale transient errors once cooldown has elapsed so failures do not
+        # linger as durable state across subsequent requests.
+        if self._session is not None and self._status == "ready":
+            self._last_error = None
+
         if self._session is None:
             await self.start()
         if self._session is None:
@@ -246,7 +251,7 @@ class CanvasMCPClient:
             return [getattr(tool, "name", "") for tool in response.tools]
         except Exception as exc:
             formatted_error = self._format_exception(exc)
-            self._status = "degraded"
+            self._status = "ready" if self._session is not None else "error"
             self._last_error = f"list_tools: {formatted_error}"
             if self._is_transport_recoverable_error(exc):
                 self._set_recovery_cooldown()
@@ -262,7 +267,7 @@ class CanvasMCPClient:
             self._last_error = None
         except Exception as exc:
             formatted_error = self._format_exception(exc)
-            self._status = "degraded"
+            self._status = "ready" if self._session is not None else "error"
             self._last_error = f"list_tool_definitions: {formatted_error}"
             if self._is_transport_recoverable_error(exc):
                 self._set_recovery_cooldown()
@@ -310,7 +315,7 @@ class CanvasMCPClient:
         except Exception as exc:
             formatted_error = self._format_exception(exc)
             self._last_error = f"{tool_name}: {formatted_error}"
-            self._status = "degraded"
+            self._status = "ready" if self._session is not None else "error"
 
             if self._is_transport_recoverable_error(exc):
                 self._set_recovery_cooldown()
