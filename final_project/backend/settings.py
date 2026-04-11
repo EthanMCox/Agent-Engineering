@@ -12,6 +12,9 @@ from dotenv import dotenv_values
 class AppSettings:
     openai_api_key: str | None
     openai_model: str
+    openai_summarizer_model: str
+    openai_log_reasoning_summaries: bool
+    openai_reasoning_effort: str | None
     cors_origins: list[str]
     log_level: str
     canvas_mcp_enabled: bool
@@ -75,6 +78,9 @@ def build_settings(raw: dict[str, Any]) -> AppSettings:
     return AppSettings(
         openai_api_key=raw.get("OPENAI_API_KEY"),
         openai_model=str(raw.get("OPENAI_MODEL", "gpt-5-nano")),
+        openai_summarizer_model=str(raw.get("OPENAI_SUMMARIZER_MODEL", "gpt-4.1-mini")),
+        openai_log_reasoning_summaries=_to_bool(raw.get("OPENAI_LOG_REASONING_SUMMARIES"), default=False),
+        openai_reasoning_effort=(str(raw.get("OPENAI_REASONING_EFFORT", "")).strip() or None),
         cors_origins=cors_origins,
         log_level=str(raw.get("LOG_LEVEL", "INFO")),
         canvas_mcp_enabled=_to_bool(raw.get("CANVAS_MCP_ENABLED"), default=False),

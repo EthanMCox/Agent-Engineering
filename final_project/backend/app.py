@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -36,6 +37,10 @@ SYSTEM_PROMPT = (
 DEFAULT_MODEL = "gpt-5-nano"
 MAX_TURNS = 12
 MAX_TOOL_ROUNDS = 4
+RAW_TURN_WINDOW = 6
+MAX_MEMORY_SECTION_ITEMS = 8
+MAX_MEMORY_ITEM_CHARS = 220
+MAX_MEMORY_SUMMARY_CHARS = 1200
 settings: AppSettings = load_settings()
 
 
@@ -111,6 +116,7 @@ app.add_middleware(
 
 client = AsyncOpenAI(api_key=settings.openai_api_key)
 conversation_store: dict[str, list[dict[str, str]]] = {}
+session_memory_store: dict[str, dict[str, Any]] = {}
 
 
 def active_model() -> str:
@@ -207,11 +213,174 @@ def extract_assistant_text(response: Any) -> str:
     return "".join(text_chunks).strip()
 
 
+def extract_reasoning_summaries(response: Any) -> list[str]:
+    summaries: list[str] = []
+    output = getattr(response, "output", None)
+    if not isinstance(output, list):
+        return summaries
+
+    for item in output:
+        if getattr(item, "type", None) != "reasoning":
+            continue
+
+        for chunk in getattr(item, "summary", []) or []:
+            text = str(getattr(chunk, "text", "") or "").strip()
+            if text:
+                summaries.append(text)
+
+    return summaries
+
+
+def build_reasoning_request_config() -> dict[str, Any] | None:
+    if not settings.openai_log_reasoning_summaries:
+        return None
+
+    config: dict[str, Any] = {"summary": "auto"}
+    effort = settings.openai_reasoning_effort
+    if effort and "gpt-5" in active_model():
+        config["effort"] = effort
+    return config
+
+
 def format_exception(exc: Exception) -> str:
     detail = str(exc).strip()
     if detail:
         return f"{type(exc).__name__}: {detail}"
     return type(exc).__name__
+
+
+def _default_session_memory() -> dict[str, Any]:
+    return {
+        "conversation_summary": "",
+        "active_goals": [],
+        "confirmed_facts": [],
+        "open_questions": [],
+        "recent_tool_findings": [],
+    }
+
+
+def _sanitize_memory_list(values: Any) -> list[str]:
+    if not isinstance(values, list):
+        return []
+
+    cleaned: list[str] = []
+    for value in values:
+        text = str(value).strip()
+        if not text:
+            continue
+        text = re.sub(r"\s+", " ", text)
+        cleaned.append(text[:MAX_MEMORY_ITEM_CHARS])
+        if len(cleaned) >= MAX_MEMORY_SECTION_ITEMS:
+            break
+    return cleaned
+
+
+def _sanitize_session_memory(memory: dict[str, Any] | None) -> dict[str, Any]:
+    baseline = _default_session_memory()
+    if not isinstance(memory, dict):
+        return baseline
+
+    summary = str(memory.get("conversation_summary", "")).strip()
+    baseline["conversation_summary"] = re.sub(r"\s+", " ", summary)[:MAX_MEMORY_SUMMARY_CHARS]
+    baseline["active_goals"] = _sanitize_memory_list(memory.get("active_goals"))
+    baseline["confirmed_facts"] = _sanitize_memory_list(memory.get("confirmed_facts"))
+    baseline["open_questions"] = _sanitize_memory_list(memory.get("open_questions"))
+    baseline["recent_tool_findings"] = _sanitize_memory_list(memory.get("recent_tool_findings"))
+    return baseline
+
+
+def _get_session_memory(session_id: str) -> dict[str, Any]:
+    memory = session_memory_store.get(session_id)
+    if memory is None:
+        memory = _default_session_memory()
+        session_memory_store[session_id] = memory
+    return _sanitize_session_memory(memory)
+
+
+def _recent_raw_messages(history: list[dict[str, str]], turn_window: int = RAW_TURN_WINDOW) -> list[dict[str, str]]:
+    if not history:
+        return []
+    messages = history[1:]
+    if not messages:
+        return []
+    return messages[-(turn_window * 2):]
+
+
+async def _summarize_text_with_small_model(
+    instruction: str,
+    content: str,
+    max_output_tokens: int = 700,
+) -> str:
+    response = await client.responses.create(
+        model=settings.openai_summarizer_model,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a compression assistant. "
+                    "Return concise, factual text only. "
+                    "Do not invent facts and do not use placeholders."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"{instruction}\n\nCONTENT:\n{content}",
+            },
+        ],
+        max_output_tokens=max_output_tokens,
+    )
+    text = extract_assistant_text(response).strip()
+    if not text:
+        raise RuntimeError("Summarizer returned empty output.")
+    return text
+
+
+def _render_memory_for_prompt(memory: dict[str, Any]) -> str:
+    sections = [
+        "Use this compact session memory as additional context. Prefer these facts over stale assumptions.",
+    ]
+    if memory["conversation_summary"]:
+        sections.append(f"Conversation summary: {memory['conversation_summary']}")
+    sections.append(f"Active goals: {json.dumps(memory['active_goals'], ensure_ascii=True)}")
+    sections.append(f"Confirmed facts: {json.dumps(memory['confirmed_facts'], ensure_ascii=True)}")
+    sections.append(f"Open questions: {json.dumps(memory['open_questions'], ensure_ascii=True)}")
+    sections.append(f"Recent tool findings: {json.dumps(memory['recent_tool_findings'], ensure_ascii=True)}")
+    return "\n".join(sections)
+
+
+async def _update_session_memory(
+    session_id: str,
+    current_memory: dict[str, Any],
+    user_message: str,
+    assistant_text: str,
+    tool_summaries: list[str],
+) -> dict[str, Any]:
+    trimmed_tool_summaries = [summary[:1200] for summary in tool_summaries[:4]]
+
+    instruction = (
+        "Update the session memory JSON with this schema exactly: "
+        "{\"conversation_summary\": string, \"active_goals\": string[], \"confirmed_facts\": string[], "
+        "\"open_questions\": string[], \"recent_tool_findings\": string[]}. "
+        "Rules: keep each list to max 8 short items, keep only high-signal facts, remove stale items, "
+        "and avoid speculation. Return JSON only."
+    )
+    content = (
+        f"CURRENT_MEMORY_JSON:\n{json.dumps(current_memory, ensure_ascii=True)}\n\n"
+        f"USER_MESSAGE:\n{user_message}\n\n"
+        f"ASSISTANT_RESPONSE:\n{assistant_text}\n\n"
+        f"TOOL_SUMMARIES:\n{json.dumps(trimmed_tool_summaries, ensure_ascii=True)}"
+    )
+
+    try:
+        updated_text = await _summarize_text_with_small_model(instruction, content, max_output_tokens=650)
+        updated_memory = json.loads(updated_text)
+        sanitized = _sanitize_session_memory(updated_memory)
+    except Exception as exc:
+        logger.warning("Session memory update fallback used session=%s error=%s", mask_session_id(session_id), format_exception(exc))
+        sanitized = _sanitize_session_memory(current_memory)
+
+    session_memory_store[session_id] = sanitized
+    return sanitized
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -246,6 +415,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail="Message must not be empty.")
 
     history = ensure_session(payload.session_id)
+    session_memory = _get_session_memory(payload.session_id)
     logger.debug(
         "Session prepared session=%s history_messages_before_append=%d user_preview=%r",
         masked_session_id,
@@ -277,25 +447,45 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                 "Canvas tools are unavailable for this request "
                 f"({unavailable_reason}). Do not fabricate Canvas facts; state uncertainty and continue with general guidance."
             )
+        raw_recent_messages = _recent_raw_messages(history)
+        memory_note = _render_memory_for_prompt(session_memory)
         working_history: list[Any] = [
             history[0],
             {"role": "system", "content": runtime_note},
-            *history[1:],
+            {"role": "system", "content": memory_note},
+            *raw_recent_messages,
         ]
 
         sources: list[dict[str, str]] = []
         usage_totals: dict[str, int] = {}
         assistant_text = ""
         tools_enabled_for_turn = bool(tools)
+        tool_outputs_for_memory: list[str] = []
+        reasoning_config = build_reasoning_request_config()
 
         for round_index in range(1, MAX_TOOL_ROUNDS + 2):
-            response = await client.responses.create(
-                model=selected_model,
-                input=working_history,
-                tools=tools if tools_enabled_for_turn else None,
-            )
+            request: dict[str, Any] = {
+                "model": selected_model,
+                "input": working_history,
+                "tools": tools if tools_enabled_for_turn else None,
+            }
+            if reasoning_config:
+                request["reasoning"] = reasoning_config
+
+            response = await client.responses.create(**request)
             usage_totals = merge_usage(usage_totals, response.usage)
             working_history.extend(getattr(response, "output", []))
+
+            if settings.openai_log_reasoning_summaries:
+                summaries = extract_reasoning_summaries(response)
+                for idx, summary in enumerate(summaries, start=1):
+                    logger.info(
+                        "Reasoning summary session=%s round=%d index=%d text=%r",
+                        masked_session_id,
+                        round_index,
+                        idx,
+                        preview_text(summary, limit=1000),
+                    )
 
             tool_calls = [
                 item for item in getattr(response, "output", []) if getattr(item, "type", None) == "function_call"
@@ -339,11 +529,12 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                     dispatch_result = await canvas_tool_registry.dispatch_tool_call(tool_name, arguments)
                     output_text = dispatch_result.output_text
                     logger.info(
-                        "Tool execution succeeded session=%s tool=%s output_chars=%d",
+                        "Tool execution succeeded session=%s tool=%s raw_output_chars=%d",
                         masked_session_id,
                         tool_name,
                         len(output_text),
                     )
+                    tool_outputs_for_memory.append(output_text)
                     if dispatch_result.sources:
                         sources.extend(dispatch_result.sources)
                 except Exception as exc:
@@ -383,6 +574,20 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         assistant_text = "I could not generate a response. Please try again."
         logger.warning("Model returned empty output; fallback message used session=%s", masked_session_id)
     history.append({"role": "assistant", "content": assistant_text})
+    updated_memory = await _update_session_memory(
+        payload.session_id,
+        session_memory,
+        user_message,
+        assistant_text,
+        tool_outputs_for_memory,
+    )
+    logger.debug(
+        "Session memory updated session=%s goals=%d facts=%d open_questions=%d",
+        masked_session_id,
+        len(updated_memory["active_goals"]),
+        len(updated_memory["confirmed_facts"]),
+        len(updated_memory["open_questions"]),
+    )
     pre_trim_count = len(history)
     trimmed_history = trim_history(history)
     conversation_store[payload.session_id] = trimmed_history
@@ -424,4 +629,5 @@ async def chat(payload: ChatRequest) -> ChatResponse:
 async def reset_chat(payload: ResetRequest) -> ResetResponse:
     logger.info("Chat session reset session=%s", mask_session_id(payload.session_id))
     conversation_store.pop(payload.session_id, None)
+    session_memory_store.pop(payload.session_id, None)
     return ResetResponse(ok=True)
