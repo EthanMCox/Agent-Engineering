@@ -31,3 +31,24 @@ def test_build_settings_defaults_and_limits() -> None:
     assert settings.canvas_mcp_enabled is True
     assert settings.canvas_mcp_course_limit == 1
     assert settings.canvas_mcp_assignments_limit == 1
+    assert settings.context_max_input_tokens >= 8000
+    assert settings.pagination_default_page_size >= 5
+    assert settings.mcp_tool_mode in {"denylist", "allowlist"}
+    assert settings.mcp_tool_profile == "student"
+    assert "canvas_submit_grade" in settings.mcp_tool_denylist
+
+
+def test_build_settings_tool_policy_values() -> None:
+    settings = build_settings(
+        {
+            "MCP_TOOL_MODE": "allowlist",
+            "MCP_TOOL_PROFILE": "instructor",
+            "MCP_TOOL_ALLOWLIST": "canvas_list_courses,canvas_get_assignment",
+            "MCP_TOOL_DENYLIST": "canvas_submit_grade",
+        }
+    )
+
+    assert settings.mcp_tool_mode == "allowlist"
+    assert settings.mcp_tool_profile == "instructor"
+    assert settings.mcp_tool_allowlist == ["canvas_list_courses", "canvas_get_assignment"]
+    assert settings.mcp_tool_denylist == ["canvas_submit_grade"]

@@ -27,7 +27,16 @@ def test_debug_list_mcp_tools(monkeypatch) -> None:
 
 
 def test_debug_call_mcp_tool(monkeypatch) -> None:
-    async def fake_dispatch(tool_name: str, arguments: dict):
+    async def fake_dispatch(
+        tool_name: str,
+        arguments: dict,
+        *,
+        session_id: str,
+        user_question: str,
+        budget_plan,
+        current_prompt_tokens: int,
+        summarize_func,
+    ):
         assert tool_name == "canvas_list_courses"
         assert arguments == {"include_ended": False}
         return type(

@@ -69,9 +69,21 @@ def test_chat_performs_tool_call_and_returns_sources(monkeypatch) -> None:
             None,
         )
 
-    async def fake_dispatch(tool_name: str, arguments: dict):
+    async def fake_dispatch(
+        tool_name: str,
+        arguments: dict,
+        *,
+        session_id: str,
+        user_question: str,
+        budget_plan,
+        current_prompt_tokens: int,
+        summarize_func,
+    ):
         assert tool_name == "list_courses"
         assert arguments == {}
+        assert session_id == "tool-seq"
+        assert user_question
+        assert current_prompt_tokens >= 0
         return type(
             "DispatchResult",
             (),
@@ -82,7 +94,7 @@ def test_chat_performs_tool_call_and_returns_sources(monkeypatch) -> None:
                         "source_type": "canvas_tool",
                         "source_id": "list_courses",
                         "label": "Canvas courses",
-                        "details": "Data fetched from Canvas MCP list_courses.",
+                    "details": "Data fetched from Canvas MCP list_courses.",
                     }
                 ],
             },
