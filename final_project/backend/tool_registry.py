@@ -99,7 +99,7 @@ class CanvasToolRegistry:
         health = await self._mcp_client.health()
         if not health.enabled:
             return [], "Canvas MCP is disabled by config (CANVAS_MCP_ENABLED=false)."
-        if health.status != "ready":
+        if health.status == "disabled":
             reason = f"Canvas MCP status is {health.status}."
             if health.last_error:
                 reason = f"{reason} {health.last_error}"

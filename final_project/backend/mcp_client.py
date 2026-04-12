@@ -30,7 +30,7 @@ except Exception as exc:  # pragma: no cover - exercised by import-time env cons
 from .settings import AppSettings
 
 logger = logging.getLogger("canvas_study_coach.backend.mcp")
-MCPStatus = Literal["disabled", "starting", "ready", "degraded", "error"]
+MCPStatus = Literal["disabled", "starting", "ready", "error"]
 
 
 @dataclass(slots=True)

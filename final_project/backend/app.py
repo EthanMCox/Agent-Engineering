@@ -103,7 +103,7 @@ class HealthResponse(BaseModel):
     model: str
     mcp_canvas_ok: bool
     mcp_canvas_enabled: bool
-    mcp_canvas_status: TypingLiteral["disabled", "starting", "ready", "degraded", "error"]
+    mcp_canvas_status: TypingLiteral["disabled", "starting", "ready", "error"]
     mcp_canvas_error: str | None = None
 
 
