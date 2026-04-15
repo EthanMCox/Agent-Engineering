@@ -36,6 +36,13 @@ def test_build_settings_defaults_and_limits() -> None:
     assert settings.mcp_tool_mode in {"denylist", "allowlist"}
     assert settings.mcp_tool_profile == "student"
     assert "canvas_submit_grade" in settings.mcp_tool_denylist
+    assert settings.mcp_response_middleware_enabled is True
+    assert settings.mcp_response_pass_through_max_tokens >= 512
+    assert settings.mcp_response_chunk_target_tokens >= 200
+    assert settings.mcp_response_max_chunks >= 1
+    assert settings.mcp_response_field_selector_max_fields >= 1
+    assert settings.mcp_response_hierarchical_merge_fanin >= 2
+    assert settings.mcp_response_llm_timeout_seconds >= 1.0
 
 
 def test_build_settings_tool_policy_values() -> None:
@@ -52,3 +59,25 @@ def test_build_settings_tool_policy_values() -> None:
     assert settings.mcp_tool_profile == "instructor"
     assert settings.mcp_tool_allowlist == ["canvas_list_courses", "canvas_get_assignment"]
     assert settings.mcp_tool_denylist == ["canvas_submit_grade"]
+
+
+def test_build_settings_mcp_response_overrides() -> None:
+    settings = build_settings(
+        {
+            "MCP_RESPONSE_MIDDLEWARE_ENABLED": "false",
+            "MCP_RESPONSE_PASS_THROUGH_MAX_TOKENS": "7000",
+            "MCP_RESPONSE_CHUNK_TARGET_TOKENS": "1800",
+            "MCP_RESPONSE_MAX_CHUNKS": "6",
+            "MCP_RESPONSE_FIELD_SELECTOR_MAX_FIELDS": "12",
+            "MCP_RESPONSE_HIERARCHICAL_MERGE_FANIN": "5",
+            "MCP_RESPONSE_LLM_TIMEOUT_SECONDS": "9.5",
+        }
+    )
+
+    assert settings.mcp_response_middleware_enabled is False
+    assert settings.mcp_response_pass_through_max_tokens == 7000
+    assert settings.mcp_response_chunk_target_tokens == 1800
+    assert settings.mcp_response_max_chunks == 6
+    assert settings.mcp_response_field_selector_max_fields == 12
+    assert settings.mcp_response_hierarchical_merge_fanin == 5
+    assert settings.mcp_response_llm_timeout_seconds == 9.5

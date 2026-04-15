@@ -6,6 +6,7 @@ import json
 import time
 from typing import Any
 
+from .context_budget import ContextBudgetPlan
 from .mcp_client import CanvasMCPClient
 from .settings import load_settings
 from .tool_registry import CanvasToolRegistry
@@ -74,7 +75,20 @@ async def _run(args: argparse.Namespace) -> int:
 
         payload = _parse_json_object(args.args)
         start = time.perf_counter()
-        result = await registry.dispatch_tool_call(args.tool, payload)
+        result = await registry.dispatch_tool_call(
+            args.tool,
+            payload,
+            session_id="probe",
+            user_question="probe",
+            budget_plan=ContextBudgetPlan(
+                max_input_tokens=settings.context_max_input_tokens,
+                reserved_output_tokens=settings.context_reserved_output_tokens,
+                reserved_system_tokens=settings.context_reserved_system_tokens,
+                max_tool_tokens_per_append=settings.tool_result_max_tokens_per_append,
+            ),
+            current_prompt_tokens=0,
+            summarize_func=None,
+        )
         elapsed_ms = int((time.perf_counter() - start) * 1000)
 
         print(

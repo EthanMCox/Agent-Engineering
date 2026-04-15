@@ -19,6 +19,7 @@ from .context_budget import estimate_tokens_from_messages
 from .mcp_client import CanvasMCPClient
 from .settings import AppSettings
 from .settings import load_settings
+from .temporal_context import build_temporal_prompt_note
 from .tool_registry import CanvasToolRegistry
 from .tool_registry import parse_tool_arguments
 
@@ -30,8 +31,10 @@ SYSTEM_PROMPT = (
     "Prefer narrow, incremental tool calls. For broad datasets, use pagination helpers and fetch only needed pages. "
     "Prefer Canvas tool-grounded facts over assumptions. "
     "If Canvas tools are unavailable or incomplete, explicitly say what is uncertain and what data is missing. "
-    "When tool provenance is present, only claim a field is unavailable if it appears in fields_missing_from_source. "
-    "If a field appears in fields_omitted_by_budget, explain it was omitted due to context budget and request a narrower follow-up. "
+    "Tool outputs are JSON envelopes; use fields_present/fields_retained/fields_dropped and policy_path metadata to explain confidence and omissions. "
+    "If fields were dropped due to compression, state that clearly and ask for a narrower follow-up when needed. "
+    "Interpret temporal phrases (for example: this semester, this term, upcoming, current) relative to today's date and local term context. "
+    "When temporal intent is ambiguous, provide the most likely term and a nearby alternative term if relevant. "
     "When you use Canvas tool data, cite it briefly in bullet form. "
     "Format answers cleanly: use short paragraphs, bullet lists when helpful, and fenced code blocks only when needed. "
     "Output markdown only. Do not output raw renderable HTML, CSS, JavaScript, or inline style attributes. "
@@ -524,8 +527,9 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                 f"Available tools: {tool_names}. "
                 "For Canvas-related user requests, call the relevant Canvas tools first and ground your answer in tool output. "
                 "Use canvas_query_tool for broad data requests and navigate using canvas_get_result_page. "
-                "When user asks for full details (description/rubric/requirements), use wrapper args such as "
-                "mediation_mode='full_if_fits' or 'full' and include_description/include_rubric/fields."
+                "For ambiguous timeframe phrasing (this semester/term, next term), use canvas_resolve_timeframe when needed. "
+                "Tool responses are processed by automatic MCP response middleware (token guard, compression, and summaries). "
+                "Legacy wrapper controls are accepted for compatibility but ignored."
             )
         else:
             runtime_note = (
@@ -534,9 +538,11 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             )
         raw_recent_messages = _recent_raw_messages(history)
         memory_note = _render_memory_for_prompt(session_memory)
+        temporal_note = build_temporal_prompt_note(user_message)
         working_history: list[Any] = [
             history[0],
             {"role": "system", "content": runtime_note},
+            {"role": "system", "content": temporal_note},
             {"role": "system", "content": memory_note},
             *raw_recent_messages,
         ]

@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from .context_budget import ContextBudgetPlan
 from .mcp_client import CanvasMCPClient
 from .tool_registry import CanvasToolRegistry
 
@@ -66,7 +67,21 @@ def create_debug_mcp_router(
     async def debug_call_mcp_tool(payload: MCPToolProbeRequest) -> MCPToolProbeResponse:
         start = time.perf_counter()
         try:
-            result = await tool_registry.dispatch_tool_call(payload.tool_name, payload.arguments)
+            settings = tool_registry._settings
+            result = await tool_registry.dispatch_tool_call(
+                payload.tool_name,
+                payload.arguments,
+                session_id="debug",
+                user_question="debug call",
+                budget_plan=ContextBudgetPlan(
+                    max_input_tokens=settings.context_max_input_tokens,
+                    reserved_output_tokens=settings.context_reserved_output_tokens,
+                    reserved_system_tokens=settings.context_reserved_system_tokens,
+                    max_tool_tokens_per_append=settings.tool_result_max_tokens_per_append,
+                ),
+                current_prompt_tokens=0,
+                summarize_func=None,
+            )
             elapsed_ms = int((time.perf_counter() - start) * 1000)
             logger.info(
                 "MCP tool debug call succeeded tool=%s latency_ms=%d output_chars=%d",

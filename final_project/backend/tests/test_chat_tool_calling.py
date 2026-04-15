@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi.testclient import TestClient
 
 from backend.app import app
@@ -88,7 +90,15 @@ def test_chat_performs_tool_call_and_returns_sources(monkeypatch) -> None:
             "DispatchResult",
             (),
             {
-                "output_text": "Canvas courses:\n- CS 301R (course_id: 10)",
+                "output_text": json.dumps(
+                    {
+                        "version": "mcp_response_envelope.v1",
+                        "tool": "list_courses",
+                        "status": "ok",
+                        "policy_path": "pass_through",
+                        "payload": {"courses": [{"id": 10, "name": "CS 301R"}]},
+                    }
+                ),
                 "sources": [
                     {
                         "source_type": "canvas_tool",

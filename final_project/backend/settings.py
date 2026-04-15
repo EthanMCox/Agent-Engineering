@@ -37,6 +37,13 @@ class AppSettings:
     mcp_tool_profile: str
     mcp_tool_denylist: list[str]
     mcp_tool_allowlist: list[str]
+    mcp_response_middleware_enabled: bool
+    mcp_response_pass_through_max_tokens: int
+    mcp_response_chunk_target_tokens: int
+    mcp_response_max_chunks: int
+    mcp_response_field_selector_max_fields: int
+    mcp_response_hierarchical_merge_fanin: int
+    mcp_response_llm_timeout_seconds: float
     canvas_domain: str | None
     canvas_api_token: str | None
 
@@ -137,6 +144,19 @@ def build_settings(raw: dict[str, Any]) -> AppSettings:
         mcp_tool_profile=tool_profile,
         mcp_tool_denylist=denylist,
         mcp_tool_allowlist=allowlist,
+        mcp_response_middleware_enabled=_to_bool(raw.get("MCP_RESPONSE_MIDDLEWARE_ENABLED"), default=True),
+        mcp_response_pass_through_max_tokens=max(
+            512, _to_int(raw.get("MCP_RESPONSE_PASS_THROUGH_MAX_TOKENS"), default=5000)
+        ),
+        mcp_response_chunk_target_tokens=max(200, _to_int(raw.get("MCP_RESPONSE_CHUNK_TARGET_TOKENS"), default=1400)),
+        mcp_response_max_chunks=max(1, _to_int(raw.get("MCP_RESPONSE_MAX_CHUNKS"), default=12)),
+        mcp_response_field_selector_max_fields=max(
+            1, _to_int(raw.get("MCP_RESPONSE_FIELD_SELECTOR_MAX_FIELDS"), default=16)
+        ),
+        mcp_response_hierarchical_merge_fanin=max(
+            2, _to_int(raw.get("MCP_RESPONSE_HIERARCHICAL_MERGE_FANIN"), default=4)
+        ),
+        mcp_response_llm_timeout_seconds=max(1.0, _to_float(raw.get("MCP_RESPONSE_LLM_TIMEOUT_SECONDS"), default=8.0)),
         canvas_domain=str(canvas_domain) if canvas_domain else None,
         canvas_api_token=raw.get("CANVAS_API_TOKEN"),
     )
