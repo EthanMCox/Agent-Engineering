@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from typing import Any
 from typing import Literal as TypingLiteral
@@ -35,6 +36,8 @@ SYSTEM_PROMPT = (
     "If fields were dropped due to compression, state that clearly and ask for a narrower follow-up when needed. "
     "Interpret temporal phrases (for example: this semester, this term, upcoming, current) relative to today's date and local term context. "
     "When temporal intent is ambiguous, provide the most likely term and a nearby alternative term if relevant. "
+    "Do not mention internal tool calls, reasoning traces, context windows, middleware, JSON envelopes, or backend processing."
+    "If you include JSON, HTML, CSS, or JavaScript, only include it when it directly answers the user's request. "
     "When you use Canvas tool data, cite it briefly in bullet form. "
     "Format answers cleanly: use short paragraphs, bullet lists when helpful, and fenced code blocks only when needed. "
     "Output markdown only. Do not output raw renderable HTML, CSS, JavaScript, or inline style attributes. "
@@ -58,6 +61,17 @@ TRANSIENT_TOOL_FAILURE_MARKERS = (
     "failed with error",
     "mcp",
 )
+FINAL_RESPONSE_RETRY_MESSAGE = "I ran into an error while preparing that response. Would you like me to try again?"
+FinalResponseGuardAction = Literal["ok", "rewrite", "error"]
+
+
+@dataclass(slots=True)
+class FinalResponseGuardDecision:
+    action: FinalResponseGuardAction
+    rewritten_response: str = ""
+    reason: str = ""
+
+
 settings: AppSettings = load_settings()
 
 
@@ -365,6 +379,70 @@ async def _summarize_text_with_small_model(
     return text
 
 
+async def _evaluate_final_response_guard(
+    *,
+    user_message: str,
+    assistant_text: str,
+) -> FinalResponseGuardDecision:
+    instruction = (
+        "You are a final response quality guard. Review the draft response for end-user clarity.\n"
+        "Return JSON only with schema:\n"
+        "{\"action\":\"ok|rewrite|error\",\"rewritten_response\":\"string\",\"reason\":\"string\"}\n"
+        "Rules:\n"
+        "- action=ok: draft is clear and user-facing.\n"
+        "- action=rewrite: draft contains internal/technical language not requested by the user. Rewrite plainly and keep key points. Do not make up information. State uncertainty if the response does not fully answer the user's question. If the response contains anything that looks like a possible error, also state that you had trouble processing the request.\n"
+        "- action=error: draft is jumbled, incoherent, or a raw tool/error message.\n"
+        "- Return a plain JSON object only.\n"
+        "- If action=error, rewritten_response must be exactly the retry message.\n"
+        "- Do not mention tool calls, reasoning traces, JSON envelopes, middleware, token/context budgets, or backend processing unless user asked.\n"
+        "- JSON/HTML/CSS/JS is allowed only if it directly answers the user's question.\n"
+        f"- The retry message is: {json.dumps(FINAL_RESPONSE_RETRY_MESSAGE)}"
+    )
+    content = (
+        f"USER_PROMPT:\n{user_message}\n\n"
+        f"DRAFT_RESPONSE:\n{assistant_text}\n"
+    )
+    try:
+        raw = await _summarize_text_with_small_model(
+            instruction,
+            content,
+            max_output_tokens=min(900, settings.openai_summarizer_max_output_tokens),
+        )
+        parsed = json.loads(raw)
+        action = str(parsed.get("action", "ok")).strip().lower()
+        rewritten = str(parsed.get("rewritten_response", "")).strip()
+        reason = str(parsed.get("reason", "")).strip()
+        if action not in {"ok", "rewrite", "error"}:
+            action = "error"
+        logger.info("Final response guard action=%s", action)
+        if action == "error":
+            return FinalResponseGuardDecision(
+                action="error",
+                rewritten_response=FINAL_RESPONSE_RETRY_MESSAGE,
+                reason=reason or "Guard marked draft response as error.",
+            )
+        if action == "rewrite":
+            if not rewritten:
+                return FinalResponseGuardDecision(
+                    action="error",
+                    rewritten_response=FINAL_RESPONSE_RETRY_MESSAGE,
+                    reason=reason or "Guard requested rewrite but did not provide one.",
+                )
+            return FinalResponseGuardDecision(
+                action="rewrite",
+                rewritten_response=rewritten,
+                reason=reason,
+            )
+        return FinalResponseGuardDecision(action="ok", rewritten_response=assistant_text, reason=reason)
+    except Exception as exc:
+        logger.warning("Final response guard fallback used error=%s", format_exception(exc))
+        return FinalResponseGuardDecision(
+            action="error",
+            rewritten_response=FINAL_RESPONSE_RETRY_MESSAGE,
+            reason=f"Guard fallback used: {format_exception(exc)}",
+        )
+
+
 async def _evaluate_tool_progress_checkpoint(
     *,
     user_question: str,
@@ -634,10 +712,9 @@ async def chat(payload: ChatRequest) -> ChatResponse:
                         }
                     )
                     logger.info(
-                        "Tool execution succeeded session=%s tool=%s mediated_output_chars=%d prompt_tokens_before=%d",
+                        "Tool execution succeeded session=%s tool=%s prompt_tokens_before processing=%d",
                         masked_session_id,
                         tool_name,
-                        len(output_text),
                         prompt_tokens_before_tool_append,
                     )
                     tool_outputs_for_memory.append(output_text)
@@ -716,6 +793,16 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     if not assistant_text:
         assistant_text = "I could not generate a response. Please try again."
         logger.warning("Model returned empty output; fallback message used session=%s", masked_session_id)
+    guard_decision = await _evaluate_final_response_guard(
+        user_message=user_message,
+        assistant_text=assistant_text,
+    )
+    if guard_decision.action == "rewrite":
+        assistant_text = guard_decision.rewritten_response
+    elif guard_decision.action == "error":
+        assistant_text = guard_decision.rewritten_response or FINAL_RESPONSE_RETRY_MESSAGE
+    else:
+        assistant_text = guard_decision.rewritten_response or assistant_text
     history.append({"role": "assistant", "content": assistant_text})
     updated_memory = await _update_session_memory(
         payload.session_id,

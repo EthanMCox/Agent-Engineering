@@ -103,6 +103,16 @@ class MCPResponseMiddleware:
         serialized_before = self._serialize_json(payload)
         token_before = estimate_tokens_from_text(serialized_before)
 
+        logger.info(
+            "MCP middleware initial payload tool=%s token_before=%d available_tool_tokens=%d current_prompt_tokens=%d fields_present=%d item_count=%d",
+            tool_name,
+            token_before,
+            available_tokens,
+            current_prompt_tokens,
+            len(fields_present),
+            item_count,
+        )
+
         warnings: list[str] = []
         processing_flags = {
             "middleware_enabled": bool(self._settings.mcp_response_middleware_enabled),
